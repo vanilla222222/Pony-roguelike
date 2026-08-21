@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightfall Charge — Room Creator</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { overflow: auto; }
+  /* the ambient starfield from style.css is nice on the menu but too loud
+     behind a dense editing UI — tone it way down here */
+  body::before{ opacity: .45; }
+  body::after{ opacity: .18; }
+
+  #editorApp{
+    max-width: 1240px; margin: 0 auto; padding: 20px 22px 60px;
+    display: flex; flex-direction: column; gap: 16px;
+    animation: editorIn .4s var(--ease) both;
+  }
+  @keyframes editorIn{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:translateY(0); } }
+  @media (prefers-reduced-motion: reduce){ #editorApp{ animation:none; } }
+
+  h1.title{ font-size: 26px; margin: 6px 0 0; letter-spacing: 4px; }
+  .subtitle{ margin: 0; }
+
+  .layout{ display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  .panel{
+    background: linear-gradient(165deg, var(--panel-hi), var(--panel));
+    border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+    padding: 16px; flex: 0 0 auto;
+    box-shadow: var(--shadow-soft);
+    transition: border-color .2s;
+  }
+  .panel h2{
+    font-size: 13px; margin: 0 0 10px; color: var(--accent2); letter-spacing: 2px;
+    text-transform: uppercase; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2::before{
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent2); box-shadow: 0 0 8px var(--accent2);
+    flex: 0 0 auto;
+  }
+  .row{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .row label{ color: var(--muted); font-size: 12px; }
+
+  select, button, textarea{
+    font-family: inherit; font-size: 13px; background: var(--panel2); color: var(--ink);
+    border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 7px 10px;
+    transition: border-color .15s, background .15s, transform .1s, box-shadow .15s;
+  }
+  select:hover, textarea:hover{ border-color: var(--border); }
+  select:focus-visible, textarea:focus-visible, button:focus-visible{
+    outline: none; border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(79,209,197,.18);
+  }
+  button{ cursor: pointer; font-weight: 600; }
+  button:hover{ filter: brightness(1.18); border-color: var(--border); }
+  button:active{ transform: translateY(1px); }
+  button:disabled{ opacity: .35; cursor: not-allowed; filter: none; transform: none; }
+  button.active{
+    background: linear-gradient(160deg, var(--accent), var(--accent-dim));
+    border-color: var(--accent); color: #fff; box-shadow: 0 0 10px rgba(139,92,246,.4);
+  }
+  button.danger.active{ background: #c9522e; border-color: #c9522e; box-shadow: 0 0 10px rgba(201,82,46,.4); }
+
+  .blockgrid{ display: inline-grid; grid-template-columns: repeat(4, 30px); gap: 4px; }
+  .blockcell{
+    width: 30px; height: 30px; background: #201d31; border: 1px solid var(--border-soft);
+    border-radius: 6px; cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .blockcell:hover{ border-color: var(--accent2); transform: scale(1.06); }
+  .blockcell.on{ background: var(--accent2); border-color: var(--accent2); box-shadow: 0 0 8px rgba(79,209,197,.4); }
+
+  .catbtns{ display: flex; gap: 5px; flex-wrap: wrap; }
+  .catbtns button{ padding: 6px 11px; }
+
+  #editorCanvas{
+    background: #000; border-radius: var(--radius-sm); display: block; cursor: crosshair; touch-action: none;
+    box-shadow: 0 0 0 1px var(--border-soft), var(--shadow-soft);
+  }
+
+  .warn{ color: var(--gold); font-size: 12px; }
+  .ok{ color: var(--green); font-size: 12px; }
+  .err{ color: var(--red); font-size: 12px; }
+
+  #exportArea, #importArea{
+    width: 100%; box-sizing: border-box; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px;
+    resize: vertical; line-height: 1.5;
+  }
+  #exportArea{ height: 220px; }
+  #importArea{ height: 90px; }
+
+  #toolPreviewCanvas{
+    background: #000; border-radius: 6px; flex: 0 0 auto;
+    box-shadow: 0 0 0 1px var(--border-soft);
+  }
+  .preview-name{ font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .preview-desc{ font-size: 11px; color: var(--muted); max-width: 230px; line-height: 1.4; }
+
+  .legend{ font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .legend span{ display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+  .legend code{
+    background: var(--panel2); border: 1px solid var(--border-soft); border-radius: 4px;
+    padding: 0 4px; font-size: 10.5px;
+  }
+
+  a.backlink{
+    color: var(--accent2); text-decoration: none; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 4px; width: fit-content;
+    transition: transform .15s;
+  }
+  a.backlink:hover{ transform: translateX(-3px); }
+
+  #statsReadout{ font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #roomWarning{ font-size: 12px; min-height: 16px; margin-top: 2px; }
+
+  kbd{
+    background: var(--panel2); border: 1px solid var(--border-soft); border-radius: 4px;
+    padding: 1px 5px; font-size: 10.5px; font-family: monospace; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div id="editorApp">
+  <a class="backlink" href="index.html">&larr; Back to game</a>
+  <h1 class="title">Room Creator</h1>
+  <p class="subtitle">Design a room, then copy the exported object into <code>js/data/roomTemplates/normal-*.js</code>.</p>
+
+  <div class="layout">
+
+    <div class="panel">
+      <h2>1 · Room</h2>
+      <div class="row">
+        <label>Type</label>
+        <select id="roomType">
+          <option value="normal">normal</option>
+          <option value="start">start</option>
+          <option value="boss">boss</option>
+          <option value="treasure">treasure</option>
+          <option value="shop">shop</option>
+          <option value="secret">secret</option>
+          <option value="petshop">petshop</option>
+          <option value="curse">curse</option>
+          <option value="sacrifice">sacrifice</option>
+          <option value="vault">vault</option>
+          <option value="challenge">challenge</option>
+          <option value="crystal">crystal</option>
+          <option value="sombra">sombra</option>
+          <option value="shrine">shrine</option>
+          <option value="arcade">arcade</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Blocks (click to toggle, 1-4 total, one 10×10 tile block each)</label>
+      </div>
+      <div class="blockgrid" id="blockGrid"></div>
+      <div class="row" style="margin-top:8px;">
+        <span id="blockCount" class="ok">1 block</span>
+      </div>
+      <div class="row">
+        <button id="undoBtn" title="Ctrl+Z">↶ Undo</button>
+        <button id="redoBtn" title="Ctrl+Y">↷ Redo</button>
+      </div>
+      <div class="row">
+        <button id="resetSpawnersBtn">Clear spawners</button>
+        <button id="resetAllBtn">Reset room</button>
+      </div>
+      <div class="row">
+        <label>Zoom</label>
+        <div class="row catbtns" id="zoomBtns" style="margin-bottom:0;">
+          <button data-px="12">S</button>
+          <button data-px="16">M</button>
+          <button data-px="24">L</button>
+          <button data-px="32">XL</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>Floors (toggle off = never spawns there; all on = any floor)</label>
+      </div>
+      <div class="row catbtns" id="floorBtns"></div>
+      <div class="row">
+        <label>Doors</label>
+      </div>
+      <p class="legend">Doors are per-block now — every 10x10 block in the room can have a door on each side that isn't shared with another block of this room. Click a marker on the canvas below to enable/disable a door there.</p>
+    </div>
+
+    <div class="panel">
+      <h2>2 · Tool</h2>
+      <div class="row catbtns" id="categoryBtns">
+        <button data-cat="enemy">Enemy <kbd>1</kbd></button>
+        <button data-cat="pickup">Pickup <kbd>2</kbd></button>
+        <button data-cat="item">Item <kbd>3</kbd></button>
+        <button data-cat="deal">Deal <kbd>4</kbd></button>
+        <button data-cat="shop">Shop <kbd>5</kbd></button>
+        <button data-cat="obstacle">Obstacle <kbd>6</kbd></button>
+        <button data-cat="erase">Erase <kbd>7</kbd></button>
+      </div>
+      <div class="row">
+        <label id="specificLabel">Specific</label>
+        <select id="specificSelect"></select>
+      </div>
+      <div class="row" id="toolPreviewRow" style="display:none;">
+        <canvas id="toolPreviewCanvas" width="48" height="48"></canvas>
+        <div style="min-width:0;">
+          <div id="toolPreviewName" class="preview-name"></div>
+          <div id="toolPreviewDesc" class="preview-desc"></div>
+        </div>
+      </div>
+      <p class="legend">
+        <span style="background:#e35b6a"></span>Enemy &nbsp;
+        <span style="background:#e3c15b"></span>Pickup &nbsp;
+        <span style="background:#8b5cf6"></span>Item &nbsp;
+        <span style="background:#7a1f2e"></span>Deal &nbsp;
+        <span style="background:#4fd1c5"></span>Shop &nbsp;
+        <span style="background:#7a746a"></span>Obstacle &nbsp;
+        <span style="background:#463a5e;border:1px solid #e3c15b"></span>Possible door &nbsp;
+        <span style="background:#2f7a52;border:1px solid #8effc1;border-radius:50%"></span>Door on (click to disable) &nbsp;
+        <span style="background:#5a2436;border:1px solid #ff5a5a;border-radius:50%"></span>Door off (click to enable)
+      </p>
+      <p class="legend" id="toolHint">Click-drag to paint tiles. Right-click-drag always erases. <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo.</p>
+
+      <h2 style="margin-top:14px;">Import</h2>
+      <p class="legend">Paste a previously exported line (or bare <code>{"m":...}</code> object) to load it back into the editor for tweaking.</p>
+      <textarea id="importArea" placeholder='ROOM_TEMPLATES.normal.push({"m":[[1,1]],"s":[[5,5,"e","g"]]});'></textarea>
+      <div class="row" style="margin-top:8px;">
+        <button id="importBtn">Load into editor</button>
+        <span id="importHint" class="warn"></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>3 · Layout</h2>
+      <canvas id="editorCanvas" width="400" height="400"></canvas>
+      <p class="legend" id="canvasInfo"></p>
+      <p id="statsReadout"></p>
+      <p id="roomWarning" class="warn"></p>
+    </div>
+
+    <div class="panel" style="flex:1 1 320px;">
+      <h2>4 · Export</h2>
+      <div class="row">
+        <button id="exportBtn">Generate</button>
+        <button id="copyBtn">Copy to clipboard</button>
+        <span id="exportHint" class="warn"></span>
+      </div>
+      <textarea id="exportArea" readonly placeholder="Click Generate..."></textarea>
+      <p class="legend">The generated line is a ready-to-run statement — paste it straight into <code>js/data/roomTemplates/normal-*.js</code>.</p>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/core/theme.js"></script>
+<script src="js/core/utils-1.js"></script>
+<script src="js/core/utils-2.js"></script>
+
+<script src="js/data/core.js"></script>
+<script src="js/data/items-1.js"></script>
+<script src="js/data/items-2.js"></script>
+<script src="js/data/items-3.js"></script>
+<script src="js/data/items-4.js"></script>
+<script src="js/data/items-5.js"></script>
+<script src="js/data/trinkets-1.js"></script>
+<script src="js/data/trinkets-2.js"></script>
+<script src="js/data/familiars-1.js"></script>
+<script src="js/data/familiars-2.js"></script>
+<script src="js/data/lists.js"></script>
+<script src="js/data/pickups.js"></script>
+<script src="js/data/collectibles.js"></script>
+<script src="js/data/economy.js"></script>
+
+<script src="js/data/enemies/growth.js"></script>
+<script src="js/data/enemies/types-1.js"></script>
+<script src="js/data/enemies/types-2.js"></script>
+<script src="js/data/enemies/types-3.js"></script>
+<script src="js/data/enemies/types-4.js"></script>
+<script src="js/data/enemies/lists.js"></script>
+<script src="js/data/enemies/bosses.js"></script>
+<script src="js/data/enemies/superbosses.js"></script>
+
+<script src="js/data/stages.js"></script>
+
+<script src="js/systems/dungeon.js"></script>
+<script src="js/systems/room.js"></script>
+<script src="js/ui/roomEditor.js"></script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nightfall Charge — A Bat Pony's Stand</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <button id="muteBtn" class="mute-btn" title="Mute (M)">🔊</button>
+  <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" step="5" title="Volume">
+  <button id="fullscreenBtn" class="mute-btn fullscreen-btn" title="Fullscreen" aria-pressed="false">⛶</button>
+
+  <!-- ===================== MAIN MENU ===================== -->
+  <div id="mainMenu" class="screen">
+    <h1 class="title">NIGHTFALL <span>CHARGE</span></h1>
+    <p class="subtitle">Equestria is under siege by the DNBs. Choose your hero.</p>
+    <p id="lifetimeStats" class="lifetime-stats"></p>
+    <p id="mainMenuTip" class="menu-tip"></p>
+    <div id="classSelect" class="class-grid"></div>
+    <!-- difficulty: scales enemy/boss HP + damage only (see main.js) -->
+    <div id="difficultySelect" class="achv-filter" role="group" aria-label="Difficulty">
+      <span class="hint">Difficulty</span>
+      <button type="button" data-difficulty="easy">Easy</button>
+      <button type="button" data-difficulty="normal" class="active">Normal</button>
+      <button type="button" data-difficulty="hard">Hard</button>
+    </div>
+    <p class="hint">Move: WASD / Arrows &nbsp;·&nbsp; Attack: Left Click or Space &nbsp;·&nbsp; Bomb: B &nbsp;·&nbsp; Build Turret (hold): V &nbsp;·&nbsp; Active Item: E &nbsp;·&nbsp; Pill: Q &nbsp;·&nbsp; Star: R &nbsp;·&nbsp; Donate: F &nbsp;·&nbsp; Reroll: G &nbsp;·&nbsp; Arcade: H &nbsp;·&nbsp; Bestiary: C &nbsp;·&nbsp; Achievements: T &nbsp;·&nbsp; Pause: Esc</p>
+    <h2 class="trophyTitle">Superbosses</h2>
+    <div id="trophyRow" class="trophy-row"></div>
+    <div class="menu-btn-row">
+      <button id="achievementsBtn" class="achv-open-btn">🏆 Achievements<span id="achievementsNewBadge" class="new-badge hidden">NEW</span></button>
+      <button id="bestiaryBtn" class="achv-open-btn">📖 Bestiary<span id="bestiaryNewBadge" class="new-badge hidden">NEW</span></button>
+    </div>
+  </div>
+
+  <!-- ===================== ACHIEVEMENTS ===================== -->
+  <div id="achievementsScreen" class="screen hidden overlay achv-overlay">
+    <h2>Achievements</h2>
+    <div id="achievementsSummary" class="achv-summary"></div>
+    <div id="achievementsFilter" class="achv-filter">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="unlocked">Unlocked</button>
+      <button data-filter="locked">Locked</button>
+    </div>
+    <div id="achievementsList" class="achv-list"></div>
+    <button id="achievementsCloseBtn">Close</button>
+  </div>
+
+  <!-- ===================== BESTIARY ===================== -->
+  <div id="bestiaryScreen" class="screen hidden overlay achv-overlay">
+    <h2>Bestiary</h2>
+    <div id="bestiarySummary" class="achv-summary"></div>
+    <div id="bestiaryTabs" class="achv-filter"></div>
+    <div id="bestiaryList" class="achv-list"></div>
+    <button id="bestiaryCloseBtn">Close</button>
+  </div>
+
+  <!-- ===================== GAME SCREEN ===================== -->
+  <div id="gameScreen" class="screen hidden">
+
+    <div id="hud">
+      <div id="hearts" class="hud-row"></div>
+      <div class="hud-row hud-resources">
+        <span class="res" id="resCoins">🪙 <b>0</b></span>
+        <span class="res" id="resKeys">🔑 <b>0</b></span>
+        <span class="res" id="resBombs">💣 <b>0</b></span>
+        <span class="res hidden" id="resTurrets" title="Built turrets in this room (Engineer Pony).">🔧 <b>0/3</b></span>
+        <span class="res hidden" id="resMinions" title="Summoned changeling minions (Changeling Queen).">🦋 <b>0/2</b></span>
+        <span class="res" id="resFloor">Floor <b>1</b></span>
+      </div>
+      <div class="hud-row hud-resources">
+        <span class="res" id="statSpeed" title="Movement speed, in pixels/second.">SPD <b>0</b></span>
+        <span class="res" id="statRate" title="Attacks per second.">RATE <b>0</b></span>
+        <span class="res" id="statDamage" title="Damage per hit.">DMG <b>0</b></span>
+        <span class="res" id="statLuck" title="Luck — raises status-effect chances, crit chance, and pickup odds.">LUCK <b>0</b></span>
+        <span class="res" id="statRange">RNG <b>0</b></span>
+      </div>
+      <div class="hud-row" id="activeItemRow">
+        <div id="activeItemIcon" class="active-icon">—</div>
+        <div id="activeItemPips" class="pips"></div>
+        <div id="pillIcon" class="active-icon pill-icon">—</div>
+        <div id="starIcon" class="active-icon star-icon">—</div>
+        <div id="trinketIcon" class="active-icon trinket-icon">—</div>
+      </div>
+    </div>
+
+    <div id="minimapWrap">
+      <button id="minimapLegendBtn" title="What do the map icons mean?">?</button>
+      <canvas id="minimap" width="150" height="150"></canvas>
+      <div id="minimapLegend" class="minimap-legend hidden"></div>
+    </div>
+
+    <div id="canvasWrap">
+      <canvas id="game" width="320" height="320"></canvas>
+
+      <!-- side info panels — absolutely positioned in the idle space either
+           side of the 320px canvas; hidden on narrow viewports (style.css) -->
+      <div id="leftPanel" class="hudPanel">
+        <div class="hudPanelSection" id="leftPanelActive"></div>
+        <div class="hudPanelSection" id="leftPanelTrinket"></div>
+        <div class="hudPanelSection" id="leftPanelStar"></div>
+        <div class="hudPanelSection" id="leftPanelPills"></div>
+      </div>
+
+      <div id="rightPanel" class="hudPanel">
+        <div class="hudPanelSection">
+          <div class="hudPanelTitle">Synergies</div>
+          <div id="synergyBar">
+            <span class="synergy-badge" id="synEcosystem" title="Ecosystem Set: own at least one item from each of the Marked-for-Death, Venom Bloom, and Skyfall attack-layer families.">🌿</span>
+            <span class="synergy-badge" id="synRotRuin" title="Rot &amp; Ruin: any Vulnerable chance AND any Poison chance at once — poison ticks hit 30% harder against a Vulnerable target.">🦠</span>
+            <span class="synergy-badge" id="synMarksman" title="Marksman's Eye: 20%+ crit chance backed by any Vulnerable source.">🎯</span>
+            <span class="synergy-badge" id="synPackBond" title="Pack Bond: own 3 or more familiars.">🐾</span>
+            <span class="synergy-badge" id="synTwinFangs" title="Twin Fangs: own both Fang Guard and Quiverstring at once.">🐺</span>
+          </div>
+        </div>
+        <div class="hudPanelSection">
+          <div class="hudPanelTitle">Items</div>
+          <div id="passivesBar"></div>
+        </div>
+        <div class="hudPanelSection">
+          <div class="hudPanelTitle">Familiars</div>
+          <div id="familiarBar"></div>
+        </div>
+      </div>
+
+      <div id="roomBanner"></div>
+      <div id="itemExamine">
+        <div class="item-examine-icon" id="itemExamineIcon"></div>
+        <div class="item-examine-text">
+          <div class="item-examine-name" id="itemExamineName"></div>
+          <div class="item-examine-quality" id="itemExamineQuality"></div>
+          <div class="item-examine-desc" id="itemExamineDesc"></div>
+        </div>
+      </div>
+      <div id="toast"></div>
+    </div>
+  </div>
+
+  <!-- ===================== PAUSE ===================== -->
+  <div id="pauseScreen" class="screen hidden overlay">
+    <h2>Paused</h2>
+    <p id="pauseStats"></p>
+    <p class="hint">Move: WASD / Arrows &nbsp;·&nbsp; Attack: Left Click or Space &nbsp;·&nbsp; Bomb: B &nbsp;·&nbsp; Build Turret (hold): V &nbsp;·&nbsp; Active Item: E &nbsp;·&nbsp; Pill: Q &nbsp;·&nbsp; Star: R &nbsp;·&nbsp; Donate: F &nbsp;·&nbsp; Reroll: G &nbsp;·&nbsp; Arcade: H &nbsp;·&nbsp; Mute: M</p>
+    <p id="pauseEquipped" class="pause-equipped"></p>
+    <button id="resumeBtn">Resume</button>
+    <button id="pauseAchievementsBtn">🏆 Achievements</button>
+    <button id="pauseBestiaryBtn">📖 Bestiary</button>
+    <button id="quitBtn">Quit to Menu</button>
+  </div>
+
+  <!-- ===================== GAME OVER ===================== -->
+  <div id="gameOverScreen" class="screen hidden overlay">
+    <h2 id="gameOverTitle">You Fell...</h2>
+    <p id="gameOverStats"></p>
+    <button id="copyRunBtn">📋 Copy Run Summary</button>
+    <button id="retryBtn">Return to Menu</button>
+  </div>
+
+  <!-- ===================== WIN ===================== -->
+  <div id="winScreen" class="screen hidden overlay">
+    <h2>Equestria is Saved!</h2>
+    <p id="winStats"></p>
+    <button id="copyWinRunBtn">📋 Copy Run Summary</button>
+    <button id="winBtn">Return to Menu</button>
+  </div>
+
+</div>
+
+<script src="js/core/theme.js"></script>
+<script src="js/core/utils-1.js"></script>
+<script src="js/core/utils-2.js"></script>
+<script src="js/core/audio.js"></script>
+
+<script src="js/data/core.js"></script>
+<script src="js/data/items-1.js"></script>
+<script src="js/data/items-2.js"></script>
+<script src="js/data/items-3.js"></script>
+<script src="js/data/items-4.js"></script>
+<script src="js/data/items-5.js"></script>
+<script src="js/data/trinkets-1.js"></script>
+<script src="js/data/trinkets-2.js"></script>
+<script src="js/data/familiars-1.js"></script>
+<script src="js/data/familiars-2.js"></script>
+<script src="js/data/lists.js"></script>
+<script src="js/data/pickups.js"></script>
+<script src="js/data/collectibles.js"></script>
+<script src="js/data/economy.js"></script>
+
+<script src="js/data/enemies/growth.js"></script>
+<script src="js/data/enemies/types-1.js"></script>
+<script src="js/data/enemies/types-2.js"></script>
+<script src="js/data/enemies/types-3.js"></script>
+<script src="js/data/enemies/types-4.js"></script>
+<script src="js/data/enemies/lists.js"></script>
+<script src="js/data/enemies/bosses.js"></script>
+<script src="js/data/enemies/superbosses.js"></script>
+
+<script src="js/data/stages.js"></script>
+
+<script src="js/achievements/core.js"></script>
+<script src="js/achievements/defs-1.js"></script>
+<script src="js/achievements/defs-2.js"></script>
+<script src="js/achievements/defs-3.js"></script>
+<script src="js/achievements/defs-4.js"></script>
+<script src="js/achievements/defs-5.js"></script>
+<script src="js/achievements/defs-6.js"></script>
+<script src="js/achievements/defs-7.js"></script>
+<script src="js/achievements/defs-8.js"></script>
+<script src="js/achievements/defs-9.js"></script>
+<script src="js/achievements/defs-10.js"></script>
+<script src="js/achievements/defs-11.js"></script>
+<script src="js/achievements/logic.js"></script>
+
+<script src="js/ui/bestiary.js"></script>
+
+<script src="js/data/roomTemplates/core.js"></script>
+<script src="js/data/roomTemplates/normal-1.js"></script>
+<script src="js/data/roomTemplates/normal-2.js"></script>
+<script src="js/data/roomTemplates/normal-3.js"></script>
+<script src="js/data/roomTemplates/normal-4.js"></script>
+
+<script src="js/systems/dungeon.js"></script>
+<script src="js/systems/room.js"></script>
+<script src="js/entities/entities.js"></script>
+<script src="js/systems/attackStyles.js"></script>
+<script src="js/systems/combat-1.js"></script>
+<script src="js/systems/combat-2.js"></script>
+<script src="js/systems/combat-3.js"></script>
+<script src="js/systems/combat-4.js"></script>
+<script src="js/systems/ai-1.js"></script>
+<script src="js/systems/ai-2.js"></script>
+<script src="js/systems/ai-3.js"></script>
+<script src="js/systems/ai-4.js"></script>
+<script src="js/systems/familiars.js"></script>
+<script src="js/systems/pills.js"></script>
+<script src="js/systems/stars.js"></script>
+<script src="js/systems/items-1.js"></script>
+<script src="js/systems/items-2.js"></script>
+<script src="js/systems/shop.js"></script>
+
+<script src="js/ui/ui.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui/render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
