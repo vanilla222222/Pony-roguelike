@@ -290,7 +290,7 @@ const CLASSES = {
      ------------------------------------------------------------- */
   changedling: {
     id:'changedling', name:'Changedling', color:'#3f4a44', mane:'#7aeeb0',
-    unlocked:false, unlockHint:'Land 150 hits with your innate fire ring',
+    unlocked:false, unlockHint:'Secret',
     // no active attack at all — see innateFireRing below. Speed picked
     // clearly above the ranged-flier norm: Griffin 185, Windigo 160,
     // Alicorn 165 — 190 reads as "faster than any of them" per the brief.
@@ -303,13 +303,13 @@ const CLASSES = {
     // Changeling's own 3.5/s — hers is a held, anchored, bigger pool, this
     // one is free and mobile, so it has to hit lighter).
     attackType:'ranged', rangedDamage:1.0, fireCooldown:0.5,
-    innateFireRing:true, fireRingRadius:55,
+    innateFireRing:true, fireRingRadius:70,
     startBombs:1, startKeys:0, startCoins:0,
     desc:'A changeling who never quite finished the change — caught somewhere between forms, and permanently smouldering because of it. Trails a faint ring of green fire everywhere she flies, no effort required. Quick on the wing, but thin-shelled.',
   },
   changelingqueen: {
     id:'changelingqueen', name:'Changeling Queen', color:'#2f3a35', mane:'#f4d35e',
-    unlocked:false, unlockHint:'Summon 40 changeling minions',
+    unlocked:false, unlockHint:'Secret',
     // a summoner, not a duelist — sedate compared to the base Changeling's
     // 170, wings kept for lineage
     redMax:4, speed:160, canFly:true,
@@ -328,8 +328,8 @@ const CLASSES = {
     // math the way her own attack is, since minions have no cooldown field
     // of their own) — 0.5/s per minion, so two of them together (1.0/s) is
     // still well under her own 1.78/s, exactly as a support summon should be.
-    summonsChangelings:true, changelingSummonCooldown:8, maxChangelingMinions:2,
-    changelingMinionDmg:0.5, changelingMinionRadius:25,
+    summonsChangelings:true, changelingSummonCooldown:4, maxChangelingMinions:4,
+    changelingMinionDmg:0.75, changelingMinionRadius:25,
     startBombs:1, startKeys:0, startCoins:0,
     desc:'The hive-mother herself — her own flame burns low, but she never fights alone. Calls in loose-drifting changeling minions to burn beside her, each carrying a small coal of her own green fire.',
   },
@@ -352,7 +352,7 @@ const CLASSES = {
   },
   engineerpony: {
     id:'engineerpony', name:'Engineer Pony', color:'#5a7a9a', mane:'#e0c25a',
-    unlocked:false, unlockHint:'Build 30 turrets',
+    unlocked:false, unlockHint:'Secret',
     redMax:5, speed:150, canFly:false,
     // deliberately the softest ranged attack in the game — Breezie's 1.2/0.38
     // (dps 3.16) and Unicorn's 1.6/0.45 (dps 3.56) are the two weakest ranged

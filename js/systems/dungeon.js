@@ -59,6 +59,8 @@ const SPECIAL_ROOM_TYPES = new Set([
   'planetarium', // floor 3 only — the D-branch entrance (Phase 7a), same deal as cpathgate
   'shrine', // per-floor coin flip, see attachSpecial below — pays in coins, not hearts
   'arcade', // Phase 4 overhaul — per-floor coin flip, coin-toll gated (see combat.js's coinLockedRoomFor), NOT auto-open
+  'floorfeature', // Phase 10 — one guaranteed per-floor special object room, new floors only (see generateDungeon)
+  'miniboss', // Phase 15 — 25% per-floor coin flip, combat-locked like 'boss' (NOT in AUTO_OPEN_ROOM_TYPES below)
 ]);
 // the subset of room types whose doors start open at creation — everything
 // else (boss/treasure/shop/vault/arcade) starts locked behind combat, a key,
@@ -66,6 +68,10 @@ const SPECIAL_ROOM_TYPES = new Set([
 // coinLockedRoomFor and room.js's populateRoom's safety net.
 const AUTO_OPEN_ROOM_TYPES = new Set([
   'start', 'secret', 'petshop', 'curse', 'sacrifice', 'challenge', 'crystal', 'sombra', 'cpathgate', 'planetarium', 'shrine',
+  // Phase 10 — floorfeature holds a stage's own interactive object, not a
+  // reward behind a lock, so it auto-opens like crystal/sombra/shrine rather
+  // than sitting behind combat/a key/a coin toll.
+  'floorfeature',
 ]);
 
 let _roomIdSeq = 1;
@@ -462,7 +468,13 @@ function generateDungeon(floorNum){
   // descend('C') and diverts the whole run onto the 3C-10C path (see
   // game.js's descend/floorPath and stages.js's C_FLOOR_KEYS). Always
   // attaches when the floor is right, so the choice is never randomly denied.
-  const cpathgateNode = floorNum === 1 ? attachSpecial('cpathgate') : null;
+  // Phase 10 — the gate now ALSO requires the C path to have been unlocked
+  // (clear the old main route once, see achievements/core.js's isPathUnlocked
+  // and game.js's descend). Locked simply means the gate room doesn't
+  // generate this run, exactly how a locked enemy is filtered out of the spawn
+  // pools rather than erroring — no new failure mode, the floor is just a
+  // normal floor 2.
+  const cpathgateNode = (floorNum === 1 && isPathUnlocked('C')) ? attachSpecial('cpathgate') : null;
   // The D-branch gate (Phase 7a) — the same idea one floor lower down: it
   // generates on floor 3 (floorNum 2) and nowhere else, and stepping onto the
   // platform inside it calls descend('D') and diverts the whole run onto the
@@ -475,7 +487,24 @@ function generateDungeon(floorNum){
   // has already left the normal path — floorPath is sticky and the C/D floor
   // numbering never revisits floorNum 1 or 2 — but the guard is explicit
   // anyway rather than relying on that coincidence.
-  const planetariumNode = (floorNum === 2 && !currentFloorPath()) ? attachSpecial('planetarium') : null;
+  const planetariumNode = (floorNum === 2 && !currentFloorPath() && isPathUnlocked('D')) ? attachSpecial('planetarium') : null;
+  // Phase 10 — the per-floor special object room. Guaranteed on every floor
+  // PAST the old main-route finale (stages.js's OLD_MAIN_ROUTE_FINAL_FLOOR),
+  // and impossible on any floor at or below it, so no pre-existing floor's
+  // layout changes at all. Each of the ten new stages gets its own object
+  // flavour in a later content phase; for now the room type exists with a
+  // single plain template (roomTemplates/floorfeature.js) so the hook is
+  // real and exercised rather than a comment promising one later.
+  const floorfeatureNode = floorNum > OLD_MAIN_ROUTE_FINAL_FLOOR ? attachSpecial('floorfeature') : null;
+  // Phase 15 — miniboss room: same per-floor coin-flip shape as petshop/
+  // challenge above (25%, matching the user-specified spec exactly), on
+  // EVERY floor including the branches — unlike floorfeature it isn't
+  // gated to floorNum > OLD_MAIN_ROUTE_FINAL_FLOOR, since it's stage-
+  // agnostic content (see minibosses.js's resolveMiniboss) rather than a
+  // per-stage flavour object. Combat-locked like 'boss' (not in
+  // AUTO_OPEN_ROOM_TYPES) — see room.js's populateRoom for what spawns
+  // inside and combat-2.js's handleEnemyDeath for its drop table.
+  const minibossNode = Util.chance(0.25) ? attachSpecial('miniboss') : null;
 
   // attachSpecial() targets the map's farthest degree-1 leaves — this variant
   // instead tries every free side of one specific anchor room, and returns
@@ -564,7 +593,7 @@ function generateDungeon(floorNum){
   return {
     rooms, start: startRoom, bossNode, treasureNode, shopNode, secretNode,
     petshopNode, curseNode, sacrificeNode, vaultNode, challengeNode, starNode, crystalNode, sombraNode, secondBossNode,
-    cpathgateNode, planetariumNode, shrineNode, arcadeNode,
+    cpathgateNode, planetariumNode, shrineNode, arcadeNode, floorfeatureNode, minibossNode,
     bounds: { minX, maxX, minY, maxY },
     floorNum,
   };

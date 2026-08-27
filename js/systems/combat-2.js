@@ -14,8 +14,11 @@ function playerChargedBeamAttack(game, dt, input){
   if (player.chargeTimer < player.chargeTime) return;
   player.chargeTimer = 0;
   player.attackTimer = player.fireCooldown;
-  // the charge plumbing is shared; WHAT a full charge fires is per-class
-  if (player.crystalVolley) playerCrystalVolleyAttack(game, input);
+  // the charge plumbing is shared; WHAT a full charge fires is per-class.
+  // Phase 11 un-bleed pass — Dragon's own `gemBreath` and Unicorn's own
+  // `shardFan` both trigger the same convergent-volley function under
+  // their own flag rather than sharing Crystal Pony's `crystalVolley`.
+  if (player.crystalVolley || player.gemBreath || player.shardFan) playerCrystalVolleyAttack(game, input);
   else playerFireBreathAttack(game);
 }
 
@@ -24,10 +27,24 @@ function playerChargedBeamAttack(game, dt, input){
 // each aimed at the CURSOR rather than straight ahead — so they converge on
 // the point you're aiming at instead of travelling as a parallel wall. Fired
 // by playerChargedBeamAttack once her 0.7s charge fills.
-const CRYSTAL_VOLLEY_OFFSETS = [-34, 0, 34];
+// px between adjacent shard start points — the SEED value only: the live
+// number is the per-instance player.crystalVolleySpacing shadow field
+// (entities.js's Player constructor), so a skilltree.js uniqueField node can
+// tune the spread the same way it can tune crystalShardCount.
+const CRYSTAL_VOLLEY_SPACING_DEFAULT = 34;
 function playerCrystalVolleyAttack(game, input){
   const player = game.player;
   input = input || {};
+  // shard count is per-instance (player.crystalShardCount, seeded to 3 in
+  // entities.js's Player constructor) rather than a fixed 3-element array,
+  // so a skilltree.js uniqueField node can add/subtract shards. Offsets are
+  // spread evenly around 0, preserving the exact original [-34, 0, 34]
+  // spacing/positions when count is still 3.
+  const count = player.crystalShardCount || 0;
+  if (count <= 0) return; // guard: no shots fired rather than crashing on a hypothetical 0
+  const offsets = [];
+  const spacing = player.crystalVolleySpacing || CRYSTAL_VOLLEY_SPACING_DEFAULT;
+  for (let i = 0; i < count; i++) offsets.push((i - (count - 1) / 2) * spacing);
   Sound.play('rangedShot');
   bumpStat('shotsFired', 1, game);
   // same viewport→world conversion updatePlayer's facing calc does, recomputed
@@ -46,7 +63,7 @@ function playerCrystalVolleyAttack(game, input){
   // normal ranged-attack range the way a plain bolt would
   const life = 999;
   const firedShards = []; // attack-layer styles (see attackStyles.js)
-  for (const off of CRYSTAL_VOLLEY_OFFSETS) {
+  for (const off of offsets) {
     const sx = player.x + px * off + player.facing.x * 10;
     const sy = player.y + py * off + player.facing.y * 10;
     // each shard aims from ITS OWN start at the shared focal point
@@ -106,7 +123,7 @@ function playerFireBreathAttack(game){
     if (applied) {
       player.onHitLanded();
       Sound.play(crit ? 'crit' : 'enemyHit');
-      if (crit) bumpStat('critsLanded', 1, game);
+      if (crit) { bumpStat('critsLanded', 1, game); e._lastHitCrit = true; } // see combat-1.js's identical comment — consumed by render.js's drawEnemy
       applyOnHitStatuses(game, e);
       game.floatTexts.push(new FloatText(e.x, e.y - 20, (crit ? 'CRIT ' : '') + dmg, crit ? '#ffcf5c' : '#fff'));
       if (e.isDead) { bumpStat('rangedKills', 1, game); handleEnemyDeath(game, e); }
@@ -127,7 +144,7 @@ function dealPlayerDamage(game, enemy, ang, opts){
   if (applied) {
     player.onHitLanded();
     Sound.play(crit ? 'crit' : 'enemyHit');
-    if (crit) bumpStat('critsLanded', 1, game);
+    if (crit) { bumpStat('critsLanded', 1, game); enemy._lastHitCrit = true; } // see combat-1.js's identical comment — consumed by render.js's drawEnemy
     applyOnHitStatuses(game, enemy);
     game.floatTexts.push(new FloatText(enemy.x, enemy.y - 20, (crit ? 'CRIT ' : '') + dmg, crit ? '#ffcf5c' : '#fff'));
     if (enemy.isDead) { bumpStat('meleeKills', 1, game); handleEnemyDeath(game, enemy); }
@@ -297,6 +314,7 @@ function grantPickupEffect(game, kind, x, y, coin, pillColor, starId){
         : player.trinketId === 'stackedcoin' ? 1.15 : player.trinketId === 'barnaclecluster' ? 1.2
         : player.trinketId === 'wovenboots' ? 1.15 : player.trinketId === 'solarscroll' ? 1.15 : player.trinketId === 'copperbelt' ? 1.1
         : player.trinketId === 'merchantscoin' ? 1.1
+        : player.trinketId === 'sk8t_giltclasp' ? 1.12 // Phase 8e slice 2 (sk8t_ — see data/trinkets-2.js)
         : 1) + 0.2 * (player.passives.gluttonyscoin || 0)
         // 75-achievement + 25-unlocked batch (see data.js) — coin value contributions
         + 0.15 * (player.passives.overflowingpurse || 0) + 0.25 * (player.passives.misersvault || 0)
@@ -322,7 +340,7 @@ function grantPickupEffect(game, kind, x, y, coin, pillColor, starId){
     case 'key': { const n = player.trinketId === 'masterbit' ? 2 : 1; player.keys += n; Sound.play('key'); game.floatTexts.push(new FloatText(x, y, '+' + n + ' key' + (n > 1 ? 's' : ''), '#dcdcdc')); break; }
     case 'doublekey': player.keys += 2; Sound.play('key'); game.floatTexts.push(new FloatText(x, y, '+2 keys', '#dcdcdc')); break;
     case 'goldkey': player.unlimitedKeysFloor = true; Sound.play('key'); game.floatTexts.push(new FloatText(x, y, 'Unlimited keys!', '#e3c15b')); break;
-    case 'bomb': { const n = player.trinketId === 'powderflask' ? 2 : 1; player.bombs += n; Sound.play('bombPickup'); game.floatTexts.push(new FloatText(x, y, '+' + n + ' bomb' + (n > 1 ? 's' : ''), '#dcdcdc')); break; }
+    case 'bomb': { const n = (player.trinketId === 'powderflask' || player.trinketId === 'sk8t_direkegcharm') ? 2 : 1; player.bombs += n; Sound.play('bombPickup'); game.floatTexts.push(new FloatText(x, y, '+' + n + ' bomb' + (n > 1 ? 's' : ''), '#dcdcdc')); break; } // sk8t_direkegcharm: Phase 8e slice 2 (see data/trinkets-2.js)
     case 'doublebomb': player.bombs += 2; Sound.play('bombPickup'); game.floatTexts.push(new FloatText(x, y, '+2 bombs', '#dcdcdc')); break;
     case 'goldbomb': player.unlimitedBombsFloor = true; Sound.play('bombPickup'); game.floatTexts.push(new FloatText(x, y, 'Unlimited bombs!', '#e3c15b')); break;
     case 'heartRed': player.heal(player.passives.swiftrecovery ? 1.5 : 1); Sound.play('heart'); game.floatTexts.push(new FloatText(x, y, '+heart', '#e35b6a')); break;
@@ -402,6 +420,19 @@ function grantPickupEffect(game, kind, x, y, coin, pillColor, starId){
       Sound.play('sack');
       game.floatTexts.push(new FloatText(x, y, 'Sack!', '#e0895a'));
       for (let i = 0; i < 3; i++) grantPickupEffect(game, rollGenericPickupKind(), x, y - 16 - i * 14);
+      break;
+    }
+    // Phase 16 — the friendly fly family's dedicated sack (data/
+    // familiars-3.js's friendlybluefly/friendlyyellowfly are
+    // `trashBagOnly:true`, so this is genuinely their only source — see
+    // room.js's pickFamiliarFromPool). Same "burst open" shape as a plain
+    // Sack above, just handing out one specific familiar instead of 3
+    // random pickups.
+    case 'trashbag': {
+      Sound.play('sack');
+      const id = Util.chance(0.5) ? 'friendlybluefly' : 'friendlyyellowfly';
+      game.floatTexts.push(new FloatText(x, y, 'Trash Bag!', '#8ac95a'));
+      hatchFriendlyFly(game, id);
       break;
     }
     case 'pill': {
@@ -515,12 +546,21 @@ function handleEnemyDeath(game, enemy){
   const node = game.currentRoom, player = game.player;
   player.onKill();
   Sound.play(enemy.isBoss ? 'bossDeath' : 'enemyDeath');
+  // Phase 12 visual pass — FX.hitStop existed as a fully-wired mechanism
+  // (see render.js's FX.hitStop/frozen and game.js's update(), which
+  // already checks FX.frozen() and freezes the whole simulation for its
+  // duration) but was never actually triggered from anywhere. A boss kill
+  // is the one moment big enough in this game to earn a freeze-frame — a
+  // brief beat before the death FX/loot drop, distinct from every ordinary
+  // enemy kill (which stays untouched, no hitStop, so normal combat never
+  // feels laggy from overuse).
+  if (enemy.isBoss) FX.hitStop(0.06);
   bumpStat('enemiesKilled', 1, game);
   // first-ever kill of this enemy type gets a one-off Bestiary discovery
   // toast (bosses/superbosses skip it — they already get plenty of fanfare
   // from their own death sound and, for superbosses, an achievement toast)
   if (bumpBestiaryCount('enemyKills', enemy.type.id, 1) && !enemy.isBoss) {
-    game.toast('📖 New Bestiary entry: ' + enemy.type.name + '!');
+    game.toast('📖 New Bestiary entry: ' + enemy.type.name + '!', false, 'info');
   }
   // Phase 7f — Collection category's scoped breadth achievements over JUST the
   // floorKey '13'/'14' roster (see achievements/defs-7.js). Guarded by the Set
@@ -538,6 +578,11 @@ function handleEnemyDeath(game, enemy){
   // Phase 7h (cont.) — Collection category's scoped breadth achievements over
   // JUST the floorKey '8D' roster (see achievements/defs-11.js). Same guarded shape.
   if (VOIDBETWEEN_WATCH_IDS.has(enemy.type.id)) checkVoidBetweenCollection(game);
+  // Phase 7h (cont.) — Collection category's scoped breadth achievements over
+  // the floorKey '9D'/'10D' roster plus the `singularity` superboss (see
+  // achievements/defs-12.js). Same guarded shape; a companion to the '8D'
+  // check directly above, never a replacement for it.
+  if (VOIDBETWEEN2_WATCH_IDS.has(enemy.type.id)) checkVoidBetween2Collection(game);
   game.runKills++; // this run's own count — see game.js startRun, shown on pause/end screens
   if (enemy.isBoss) bumpStat('bossesKilled', 1, game);
   if (enemy.type && enemy.type.id === 'swarmerdnb') bumpStat('swarmerdnbKilled', 1, game); // see achievements.js's swarmslayer/swarmexterminator
@@ -554,11 +599,85 @@ function handleEnemyDeath(game, enemy){
     }
   }
 
+  // Phase 17 — DNB Crypt Hive/Bomb Hive (data/enemies/crypt-extra.js).
+  // Generic on-death payload fields, not bespoke to those two ids: any
+  // enemy type could carry either going forward. spawnFliesOnDeath spawns
+  // a ring of a given child enemy id (used for dnbfly, but not tied to it);
+  // spawnBombsOnDeath drops N live 'enemy'-owned bombs (placeBombAt already
+  // treats owner !== 'player' as free — no bomb-count cost, still hurts the
+  // player same as any other bomb, see combat-3.js's explodeAt).
+  if (enemy.type.spawnFliesOnDeath) {
+    const cfg = enemy.type.spawnFliesOnDeath;
+    const childType = ENEMY_TYPES[cfg.id];
+    if (childType) {
+      for (let i = 0; i < cfg.count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const r = Util.rand(cfg.minRadius || 10, cfg.radius || 40);
+        const spot = findNearestFloor(node, Math.floor((enemy.x + Math.cos(ang) * r) / TILE), Math.floor((enemy.y + Math.sin(ang) * r) / TILE));
+        node.enemies.push(new Enemy(childType, spot.x, spot.y, game.dungeon.floorNum));
+      }
+    }
+  }
+  if (enemy.type.spawnBombsOnDeath) {
+    for (let i = 0; i < enemy.type.spawnBombsOnDeath; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const r = Util.rand(14, 40);
+      placeBombAt(game, enemy.x + Math.cos(ang) * r, enemy.y + Math.sin(ang) * r, 'enemy');
+    }
+  }
+
+  // Phase 19 — Chain Rattler (data/enemies/crypt-extra2.js): a linked pair,
+  // spawned together via groupSize:2. Killing either instantly kills its
+  // still-living partner too (found by matching type.id in the same room) —
+  // simpler and just as readable as a real shared-HP-pool would have been,
+  // and needs no changes to takeDamage. The recursive handleEnemyDeath call
+  // terminates on its own: by the time it runs, `enemy.isDead` is already
+  // true, so the partner's OWN search (which filters `!isDead`) can never
+  // find its way back to it.
+  if (enemy.type.linkedDeath) {
+    const partner = node.enemies.find(o => o !== enemy && !o.isDead && o.type.id === enemy.type.id);
+    if (partner) { partner.isDead = true; handleEnemyDeath(game, partner); }
+  }
+
+  // Phase 19 — Grave Robber (data/enemies/crypt-extra2.js's 'thief'
+  // behavior): whatever it stole gets dropped back, unchanged, at the spot
+  // it died — same Pickup instance (kind/coin-tier/pill-color/star-id all
+  // intact), just relocated and un-collected, rather than rolling a fresh
+  // random reward in its place.
+  if (enemy.stolenPickup) {
+    const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
+    const p = enemy.stolenPickup;
+    p.x = spot.x; p.y = spot.y; p.collected = false; p.bobPhase = Math.random() * Math.PI * 2;
+    node.pickups.push(p);
+  }
+
   if (enemy.isBoss) {
     node.bossDefeated = true;
     const spot = findNearestFloor(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
     addItemPedestal(node, pickItemFromPool('boss'), spot.x, spot.y);
     game.onBossDefeated(enemy);
+  } else if (enemy.isMiniboss) {
+    // Phase 15 — the miniboss room's drop table, exactly as specified:
+    // 25% lucky penny / 25% chest / 25% item / 25% star. A single
+    // Util.choice over 4 equal-weight outcomes rather than four independent
+    // Util.chance(0.25) rolls — the latter could easily drop nothing at all
+    // (or double up), and a miniboss room should never feel like it whiffed
+    // after a real fight. Deliberately does NOT call game.onBossDefeated
+    // (that fires boss-specific music/achievement/stat hooks a miniboss
+    // was never meant to trigger) and does not set any node.xDefeated flag
+    // (door-unlock is the fully generic checkRoomCleared path — see
+    // room.js's populateRoom miniboss branch).
+    const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
+    const drop = Util.choice(['penny', 'chest', 'item', 'star']);
+    if (drop === 'penny') {
+      node.pickups.push(new Pickup('coin', spot.x, spot.y, COIN_TYPES.find(c => c.id === 'luckypenny') || Util.weighted(COIN_TYPES)));
+    } else if (drop === 'chest') {
+      node.chests.push(new Chest(Util.weighted(CHEST_TYPE_POOL).id, spot.x, spot.y));
+    } else if (drop === 'item') {
+      addItemPedestal(node, pickItemFromPool('boss'), spot.x, spot.y);
+    } else {
+      node.pickups.push(new Pickup('star', spot.x, spot.y, rollRandomStarId()));
+    }
   } else if (player.trinketId === 'shinyshell' && Util.chance(0.08)) {
     const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
     node.pickups.push(new Pickup('heartRed', spot.x, spot.y));
@@ -574,11 +693,21 @@ function handleEnemyDeath(game, enemy){
   } else if (player.trinketId === 'ossuarykey' && Util.chance(0.04)) {
     const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
     node.pickups.push(new Pickup('key', spot.x, spot.y));
+  } else if (player.trinketId === 'sk8t_boneshakerpouch' && Util.chance(0.05)) {
+    // Phase 8e slice 2 (sk8t_ — see data/trinkets-2.js) — same shape as Powder
+    // Pouch above, different pickup/odds.
+    const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
+    node.pickups.push(new Pickup('bomb', spot.x, spot.y));
   }
   if (!enemy.isBoss && player.passives.goldenclover && Util.chance(0.05 * player.passives.goldenclover)) {
     const spot = findClearFloorSpot(node, Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE));
     node.pickups.push(new Pickup('coin', spot.x, spot.y, Util.weighted(COIN_TYPES)));
   }
+  // Phase 16 — Fly Jar / Honeycomb (data/items-7.js), same "!isBoss +
+  // Util.chance(base * stacks)" shape as Golden Clover just above, one
+  // check per passive so they stack independently of each other.
+  if (!enemy.isBoss && player.passives.flyjar && Util.chance(0.02 * player.passives.flyjar)) hatchFriendlyFly(game, 'friendlybluefly');
+  if (!enemy.isBoss && player.passives.honeycomb && Util.chance(0.02 * player.passives.honeycomb)) hatchFriendlyFly(game, 'friendlyyellowfly');
 
   // champions (room.js's post-population promotion — normal rooms only, one
   // per room) pay out one bonus pickup half the time. Its own `if`, like
@@ -588,5 +717,25 @@ function handleEnemyDeath(game, enemy){
     spawnResolvedPickup(node, rollGenericPickupKind(), spot.x, spot.y);
   }
 
-  if (checkRoomCleared(game, node)) game.onRoomJustCleared();
+  if (checkRoomCleared(game, node)) {
+    // Phase 16 — Rotting Carcass (data/items-7.js): a chance to hatch one
+    // random friendly fly every time a room is actually cleared, not per
+    // kill — a much rarer trigger than Fly Jar/Honeycomb above, so its base
+    // chance is deliberately far higher to still feel worth carrying.
+    if (player.passives.rottingcarcass && Util.chance(0.25 * player.passives.rottingcarcass)) {
+      hatchFriendlyFly(game, Util.chance(0.5) ? 'friendlybluefly' : 'friendlyyellowfly');
+    }
+    game.onRoomJustCleared();
+  }
+}
+
+// Phase 16 — the one place that actually adds a friendly fly familiar
+// (data/familiars-3.js's friendlybluefly/friendlyyellowfly), shared by the
+// Fly Jar/Honeycomb/Rotting Carcass passives above and the Swarm Canister/
+// Trash Compactor active items (items-2.js's useActiveEffect) — so every
+// fly-spawning effect in the game stays in sync if this ever needs to
+// change (a sound, a toast, a stat bump), instead of each call site
+// re-implementing "add this familiar" slightly differently.
+function hatchFriendlyFly(game, id){
+  addFamiliar(game, FAMILIAR_TYPES[id]);
 }

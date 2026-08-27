@@ -54,10 +54,41 @@ function startChallengeRoom(game, node){
 // (updateEnemy runs every frame per enemy, so this must not be a bare warn).
 const _warnedBehaviors = new Set();
 
+// Registry for enemy/boss behaviors defined outside this file. Any content
+// file may do `ENEMY_BEHAVIOR_HANDLERS.myBehavior = function(game, e, dt) {...}`
+// at load time (before combat-3.js's updateEnemy switch falls through to its
+// default case) instead of adding a case to the switch above — avoids every
+// new content file needing to edit this shared file. See default case below.
+const ENEMY_BEHAVIOR_HANDLERS = {};
+
 function updateEnemy(game, e, dt){
   if (e.isDead) return;
   const node = game.currentRoom;
   if (e.hitFlash > 0) e.hitFlash -= dt;
+
+  // Phase 18 — general stuck-in-a-tile safety net. Nothing is SUPPOSED to
+  // ever leave an enemy sitting somewhere collidesAt would refuse to walk
+  // it INTO (knockback shoving it past a wall/tallrock, a wall-hugger's own
+  // teleport landing on top of an obstacle, a future behavior bug), but if
+  // it ever happens, sitting there is much worse than a single visible
+  // blink — a wedged enemy can neither reach the player nor be reached in
+  // melee, and a room can end up permanently uncompletable. e.stuckTimer is
+  // lazily initialized like every other ad-hoc timer field the newer
+  // behaviors already use (skitterPause etc.) — no entities.js edit needed.
+  if (e.stuckTimer === undefined) e.stuckTimer = 0;
+  if (collidesAt(e, e.x, e.y, node, node.obstacles)) {
+    e.stuckTimer += dt;
+    if (e.stuckTimer > 0.75) {
+      const spot = findNearestFloor(node, Math.floor(e.x / TILE), Math.floor(e.y / TILE));
+      e.x = spot.x * TILE + TILE / 2; e.y = spot.y * TILE + TILE / 2;
+      e.stuckTimer = 0;
+      // clear anything mid-motion that might have caused (or would
+      // immediately re-cause) the wedge
+      e.dashing = false; e.dashVX = 0; e.dashVY = 0; e.knockX = 0; e.knockY = 0;
+    }
+  } else {
+    e.stuckTimer = 0;
+  }
 
   if (Math.abs(e.knockX) > 0.15 || Math.abs(e.knockY) > 0.15) {
     tryMoveEntity(e, node, node.obstacles, e.knockX, e.knockY);
@@ -156,6 +187,12 @@ function updateEnemy(game, e, dt){
       case 'bossIronBastion': aiBossIronBastion(game, e, dt); break;
       default: {
         const key = String(e.behavior);
+        // Registry fallback: lets new content files register a behavior by
+        // name (ENEMY_BEHAVIOR_HANDLERS[key] = fn(game, e, dt)) without ever
+        // needing to edit this shared switch — added for Phase 10 so the
+        // parallel per-stage content passes never collide on this file.
+        const handler = ENEMY_BEHAVIOR_HANDLERS[key];
+        if (handler) { handler(game, e, dt); break; }
         if (!_warnedBehaviors.has(key)) {
           _warnedBehaviors.add(key);
           console.warn('updateEnemy: unknown behavior "' + key + '" on enemy type "' +
@@ -170,7 +207,18 @@ function updateEnemy(game, e, dt){
   if (e.contactCooldown > 0) e.contactCooldown -= dt;
   const player = game.player;
   const rr = e.radius + player.radius;
-  const suppressPlayerContact = e.submerged || e.freezeTimer > 0 || e.charmTimer > 0;
+  // Phase 16 — e.type.harmless (data/enemies/flies.js's dnbfly) opts an
+  // enemy OUT of contact damage entirely. Without this, `dmg:0` alone
+  // wouldn't have worked: playerDamageAmount's `dmgHalves > 0 ? dmgHalves :
+  // CONTACT_DMG_DEFAULT` treats a falsy/zero dmg as "unset", not "zero on
+  // purpose", and would have quietly substituted the default contact
+  // damage instead of dealing none — so this enemy needs its own explicit
+  // opt-out rather than just authoring dmg:0 on its ENEMY_TYPES entry.
+  // e.spent (Phase 19 — data/enemies/crypt-extra2.js's Coffin Lid) is the
+  // per-INSTANCE counterpart to e.type.harmless above: a one-shot ambush
+  // enemy that spends its single lunge and goes permanently, harmlessly
+  // still afterward, rather than being harmless (or not) for its whole life.
+  const suppressPlayerContact = e.submerged || e.freezeTimer > 0 || e.charmTimer > 0 || e.type.harmless || e.spent;
   if (!e.isDead && !suppressPlayerContact && Util.dist2(e.x, e.y, player.x, player.y) < rr * rr && e.contactCooldown <= 0) {
     damagePlayer(game, playerDamageAmount(game, e.isBoss, e.dmg), e.type.id); // see the Bestiary's per-enemy death count
     e.contactCooldown = e.isBoss ? 0.6 : (e.type.contactCooldown || 0.7);
@@ -306,7 +354,7 @@ function updateProjectiles(game, dt){
           if (applied) {
             if (isPlayerBolt) { player.onHitLanded(); applyOnHitStatuses(game, e); }
             Sound.play(crit ? 'crit' : 'enemyHit');
-            if (crit) bumpStat('critsLanded', 1, game);
+            if (crit) { bumpStat('critsLanded', 1, game); e._lastHitCrit = true; } // see combat-1.js's identical comment — consumed by render.js's drawEnemy
             game.floatTexts.push(new FloatText(e.x, e.y - 20, (crit ? 'CRIT ' : '') + dmg, crit ? '#ffcf5c' : '#fff'));
             if (e.isDead) { if (isPlayerBolt) bumpStat('rangedKills', 1, game); handleEnemyDeath(game, e); }
             // attack-layer styles (see attackStyles.js) — only tagged player

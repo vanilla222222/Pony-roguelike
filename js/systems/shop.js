@@ -2,24 +2,40 @@
 /* ============================================================
    shop.js — shop pricing (with the donation machine's permanent
    discounts folded in) and the donation machine itself: a fixture
-   in every shop room that takes 1 coin at a time, up to 1000c
+   in every shop room that takes 1 coin at a time, up to 5000c
    lifetime across all your runs. See room.js's addShopSlot (pricing
    + placement), items.js's updateShop (buying a slot), and game.js's
    tryDonate (feeding the machine, bound to the F key in main.js).
 
    The donation total is just another lifetime stat (see
-   achievements.js's bumpStat) — every 50c crosses the threshold of
-   one of the 20 achievements in that file's "Donations" category,
-   which is what actually grants the reward (a -1c discount, item,
-   trinket, or familiar) and records it in the save. This file only
-   tracks the running total and prices things against whatever
-   discounts those achievements have unlocked so far — see
-   unlockAchievement()'s def.shopDiscount handling.
+   achievements.js's bumpStat) — every 50c up to 1000c, then every
+   1000c from 1000c to DONATION_CAP, crosses the threshold of one of
+   the "Donations" category achievements, which is what actually
+   grants the reward (a -1c discount, item, trinket, familiar, or —
+   for the four milestones past 1000c, once every -1c discount kind is
+   already spoken for — a flat skill-point bonus; see
+   unlockAchievement()'s def.skillPoints handling in logic.js) and
+   records it in the save. This file only tracks the running total and
+   prices things against whatever discounts those achievements have
+   unlocked so far — see unlockAchievement()'s def.shopDiscount
+   handling.
+
+   Independently of that achievement ladder, every 25c donated also
+   pays 1 skill point directly — see awardDonationSkillPoints() in
+   achievements/logic.js, called right after bumpStat('donationTotal',
+   ...) below. That's a much faster drip than the bestiary tiers, by
+   design: the donation machine is a guaranteed, always-available
+   skill-point sink for whatever surplus coin a run doesn't spend.
 
    Persisted alongside the rest of the save data in localStorage's
    'nightfallUnlocks' blob (see main.js loadUnlocks/saveUnlocks):
-     unlocks.stats.donationTotal — lifetime coins fed in, capped at
-                                    DONATION_CAP
+     unlocks.stats.donationTotal              — lifetime coins fed in,
+                                                 capped at DONATION_CAP
+     unlocks.stats.donationSkillPointsAwarded — how many of the
+                                                 every-25c skill points
+                                                 have already been paid,
+                                                 so awardDonationSkillPoints
+                                                 never double-pays
      unlocks.donationDiscounts   — { buyableKind: true, ... } — which
                                     of the 10 -1c discounts have been
                                     earned (see SHOP_BASE_PRICES; Star
@@ -28,7 +44,11 @@
                                     grants it a discount)
    ============================================================ */
 
-const DONATION_CAP = 1000;
+const DONATION_CAP = 5000;
+// every 25c donated (independent of the achievement ladder) pays 1 skill
+// point — see awardDonationSkillPoints in achievements/logic.js, called
+// from tryDonateMachine right below.
+const DONATION_SKILL_POINT_INTERVAL = 25;
 
 /* ------------------------------------------------------------------
    WHAT A RUN ACTUALLY EARNS — derived once, here, so nobody has to
@@ -89,7 +109,7 @@ const SHOP_BASE_PRICES = {
   // (it's the one you buy when you're about to die and have 3c), a
   // battery is the most expensive (it re-fires whatever active you're
   // carrying, and some of those are room-wipes).
-  heartRed: 3, heartBlue: 6, bomb: 5, key: 5, pill: 5, star: 7, sack: 8, battery: 9,
+  heartRed: 3, heartBlue: 6, bomb: 5, key: 5, pill: 5, star: 7, sack: 8, battery: 9, trashbag: 10,
   item: SHOP_ITEM_PRICE, trinket: SHOP_TRINKET_PRICE, familiar: SHOP_FAMILIAR_PRICE,
 };
 // human labels for a buyable kind — used both for the donation discount
@@ -97,7 +117,7 @@ const SHOP_BASE_PRICES = {
 // reward line (buildAchievementsPanel).
 const SHOP_KIND_LABELS = {
   heartRed:'Red Heart', heartBlue:'Blue Heart', bomb:'Bomb', key:'Key', pill:'Pill', star:'Star',
-  sack:'Sack', battery:'Battery', item:'Item', trinket:'Trinket', familiar:'Familiar',
+  sack:'Sack', battery:'Battery', trashbag:'Trash Bag', item:'Item', trinket:'Trinket', familiar:'Familiar',
 };
 
 function isDonationDiscountUnlocked(kind){
@@ -149,6 +169,7 @@ function tryDonateMachine(game){
   Sound.play('coin');
   game.floatTexts.push(new FloatText(player.x, player.y - 26, '-1c donated', '#e3c15b'));
   bumpStat('donationTotal', 1, game); // its own independent load/save — checks/unlocks the "Donations" achievements
+  awardDonationSkillPoints(game); // every 25c drips 1 more skill point, see logic.js
 }
 
 /* ------------------------------------------------------------------

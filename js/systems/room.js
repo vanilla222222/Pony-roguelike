@@ -297,10 +297,11 @@ function populateRoom(node, dungeon, opts){
     }
   }
 
-  // Safety net: 'normal'/'boss' rooms start combat-locked (see ensureRoomBuilt)
-  // and only unlock on an enemy-death event. A template with no enemies would
-  // otherwise never fire that event and lock the player out permanently.
-  if ((node.type === 'normal' || node.type === 'boss') && node.enemies.length === 0) {
+  // Safety net: 'normal'/'boss'/'miniboss' rooms start combat-locked (see
+  // ensureRoomBuilt) and only unlock on an enemy-death event. A template
+  // with no enemies would otherwise never fire that event and lock the
+  // player out permanently.
+  if ((node.type === 'normal' || node.type === 'boss' || node.type === 'miniboss') && node.enemies.length === 0) {
     node.doorsOpen = true;
     node.cleared = true;
   }
@@ -357,10 +358,24 @@ function populateRoomProcedural(node, dungeon, opts){
 
   if (node.type === 'normal') {
     const budget = Util.clamp(2 + Math.floor(floorNum * 1.3) + Util.randi(0, 2), 2, 8);
-    for (let i = 0; i < budget; i++) {
+    let spent = 0;
+    while (spent < budget) {
       if (!spots.length) break;
       const s = takeSpot();
-      node.enemies.push(new Enemy(resolveGenericEnemy(floorNum, floorBranch), s.x, s.y, floorNum));
+      const type = resolveGenericEnemy(floorNum, floorBranch);
+      // Phase 16 — a type with `groupSize` (data/enemies/flies.js's
+      // dnbnuclearfly/dnbswarmfly) always spawns as a cluster instead of a
+      // lone individual: `groupSize` copies at the same tile, jittered a
+      // few pixels apart so they don't perfectly overlap on frame one, and
+      // counted as that many against the room's enemy budget (same cost as
+      // rolling that many separate individuals would have been).
+      const n = Math.max(1, type.groupSize || 1);
+      for (let i = 0; i < n; i++) {
+        const en = new Enemy(type, s.x, s.y, floorNum);
+        if (n > 1) { en.x += Util.rand(-10, 10); en.y += Util.rand(-10, 10); }
+        node.enemies.push(en);
+      }
+      spent += n;
     }
     scatterObstacles(Util.randi(0, 4));
     if (Util.chance(0.30)) {
@@ -373,6 +388,17 @@ function populateRoomProcedural(node, dungeon, opts){
     const boss = new Boss(bossType, center.x, center.y, floorNum);
     node.enemies.push(boss);
     node.bossDefeated = false;
+  } else if (node.type === 'miniboss') {
+    // Phase 15 — same single-occupant shape as the 'boss' branch above,
+    // just the Miniboss class (entities.js) and the stage-agnostic
+    // resolveMiniboss (data/enemies/minibosses.js) instead of Boss/
+    // resolveGenericBoss. Door-unlock is entirely generic (combat-3.js's
+    // checkRoomCleared fires off node.enemies.some(e=>!e.isDead) for ANY
+    // room type) so no node.xDefeated flag is needed here at all — the
+    // drop table lives in combat-2.js's handleEnemyDeath instead, on the
+    // enemy.isMiniboss branch right after the isBoss one.
+    const center = findNearestFloor(node, Math.floor(node.tileW / 2), Math.floor(node.tileH / 2));
+    node.enemies.push(new Miniboss(resolveMiniboss(floorNum), center.x, center.y, floorNum));
   } else if (node.type === 'treasure') {
     addItemOrTrinketPedestal(node, 'treasure', Math.floor(node.tileW / 2), Math.floor(node.tileH / 2), 0.55);
   } else if (node.type === 'shop') {
@@ -465,6 +491,14 @@ function populateRoomFromTemplate(node, dungeon, opts){
     node.enemies.push(new Boss(bossType, center.x, center.y, floorNum));
   }
   if (node.type === 'boss') node.bossDefeated = false;
+  // Phase 15 — same safety net, one tier down: a hand-authored miniboss
+  // template (room-editor) that forgets to place its occupant would
+  // otherwise generate an empty, permanently-locked room (see the
+  // AUTO_OPEN_ROOM_TYPES exclusion in dungeon.js).
+  if (node.type === 'miniboss' && !node.enemies.some(e => e.isMiniboss)) {
+    const center = findNearestFloor(node, Math.floor(node.tileW / 2), Math.floor(node.tileH / 2));
+    node.enemies.push(new Miniboss(resolveMiniboss(floorNum), center.x, center.y, floorNum));
+  }
 }
 
 function instantiateSpawner(node, dungeon, floorNum, sp, opts){
@@ -592,7 +626,16 @@ function resolveGenericEnemy(floorNum, branch, floorPath){
   // including the last-ditch whole-ENEMY_LIST fallback, so there is no path
   // through this function that can spawn a locked creature. The unlock state
   // is the run's start-of-run snapshot (achievements.js currentUnlocks).
-  const avail = e => !e.locked || isEnemyUnlocked(e.id);
+  // `!e.neverRandom` is the same idea, applied at every step too (Phase 16 —
+  // see data/enemies/flies.js's dnbfly): a harmless decorative floater that
+  // must ONLY ever appear via a deliberate hand placement (room editor,
+  // future scripted spawn), never a random room roll.
+  // `e.onlyFloorNum` (Phase 19 — data/enemies/crypt-extra2.js) restricts a
+  // type to one specific literal floorNum ("the first floor" means floorNum
+  // 0 exactly, not all of stage 0's two-floor window) — checked here too so
+  // every pool, including the ultimate fallback, respects it.
+  const avail = e => (!e.locked || isEnemyUnlocked(e.id)) && !e.neverRandom
+    && (e.onlyFloorNum === undefined || e.onlyFloorNum === floorNum);
   const floorKey = floorKeyFor(floorNum, branch, currentFloorPath(floorPath));
   if (floorKey) {
     const fkPool = ENEMY_LIST.filter(e => e.floorKey === floorKey && !e.isMinion && avail(e));
@@ -600,12 +643,21 @@ function resolveGenericEnemy(floorNum, branch, floorPath){
   }
   const stage = stageIndexForFloor(floorNum);
   const floorInStage = floorNum % FLOORS_PER_STAGE;
-  let pool = ENEMY_LIST.filter(e => e.stage === stage && !e.isMinion && avail(e) && (e.xpTier || 1) <= 1 + floorInStage);
-  if (!pool.length) pool = ENEMY_LIST.filter(e => e.stage === stage && !e.isMinion && avail(e));
-  // final fallback keeps its "any enemy at all" breadth, minus the locked ones
-  // (every stage has plenty of always-unlocked entries, so this can't empty out)
+  // Phase 16 — `stage === 'universal'` is a new third option alongside a
+  // numeric stage index: a type tagged this way is eligible on EVERY floor
+  // of the main route, not just one stage's own two-floor window. See
+  // data/enemies/flies.js's dnbredfly/dnbyellowjacket/dnbnuclearfly/
+  // dnbswarmfly/dnbspider — deliberately NOT tied to any one stage's theme.
+  const stageMatch = e => e.stage === stage || e.stage === 'universal';
+  let pool = ENEMY_LIST.filter(e => stageMatch(e) && !e.isMinion && avail(e) && (e.xpTier || 1) <= 1 + floorInStage);
+  if (!pool.length) pool = ENEMY_LIST.filter(e => stageMatch(e) && !e.isMinion && avail(e));
+  // final fallback keeps its "any enemy at all" breadth, minus the locked/
+  // neverRandom ones (every stage has plenty of always-unlocked entries, so
+  // this can't empty out) — the ultimate `: ENEMY_LIST` below is filtered
+  // too now, since unlike locked-only that branch used to skip `avail()`
+  // entirely (dead in practice per the comment above, but no longer a loophole).
   if (!pool.length) pool = ENEMY_LIST.filter(avail);
-  return pickBiasedEnemy(pool.length ? pool : ENEMY_LIST);
+  return pickBiasedEnemy(pool.length ? pool : ENEMY_LIST.filter(avail));
 }
 
 function resolveGenericBoss(floorNum, branch, floorPath){
@@ -653,11 +705,13 @@ function rollGenericPickupKind(){
   return kind;
 }
 
-// the 10% "sack/battery" slice of the room-clear reward — battery further
-// splits into a 50/50 full-charge vs 2-slot mini-charge (see CLEAR_REWARD_CHANCE).
-// All three start locked (see achievements.js); returns null if none are
-// unlocked yet so the caller can fall back to an ordinary pickup instead.
-const SACK_BATTERY_WEIGHTS = { sack:50, minibattery:25, battery:25 };
+// NOTE (found, not introduced, during Phase 16 — left as-is rather than
+// silently deleted): this table/function is dead code. The real sack/
+// battery room-clear slice lives in economy.js's RARE_POOL, read by
+// spawnClearRoomPickup below — nothing in the codebase actually calls
+// rollSackBatteryKind(). trashbag was added to RARE_POOL instead (see
+// economy.js), not here, so it actually takes effect in play.
+const SACK_BATTERY_WEIGHTS = { sack:50, minibattery:25, battery:25, trashbag:15 };
 function rollSackBatteryKind(){
   const candidates = Object.keys(SACK_BATTERY_WEIGHTS).filter(isPickupKindUnlocked).map(id => ({ id, w: SACK_BATTERY_WEIGHTS[id] }));
   if (!candidates.length) return null;
@@ -773,7 +827,11 @@ function addFamiliarPedestal(node, familiar, tx, ty){
 }
 
 function pickFamiliarFromPool(){
-  const candidates = FAMILIAR_LIST.filter(f => !f.locked || isFamiliarUnlocked(f.id));
+  // Phase 16 — trashBagOnly (data/familiars-3.js's friendly flies) opts a
+  // familiar out of every normal pedestal roll, same idea as `neverRandom`
+  // does for enemies (resolveGenericEnemy above) — its only source is the
+  // Trash Bag pickup (combat-2.js's grantPickupEffect 'trashbag' case).
+  const candidates = FAMILIAR_LIST.filter(f => (!f.locked || isFamiliarUnlocked(f.id)) && !f.trashBagOnly);
   return candidates.length ? Util.choice(candidates) : null;
 }
 
@@ -865,6 +923,7 @@ function rerollOnePedestal(node){
    Every kind in the list is non-blocking in both directions, so swapping
    any of them for any other never opens or closes a path. */
 const REROLLABLE_HAZARD_KINDS = ['cactus', 'yellowfire', 'redfire', 'bluefire', 'purplefire',
+  'greenfire', 'whitefire', 'blackfire', // Phase 15
   'spiketrap', 'movingspike', 'sandtrap', 'mud'];
 
 function rerollRoomHazards(node){
@@ -1068,17 +1127,23 @@ function spawnClearRoomPickup(game){
   const spot = findClearFloorSpot(node, Math.floor(node.tileW / 2), Math.floor(node.tileH / 2));
 
   if (tier === 'common') {
-    const cat = Util.weighted(COMMON_CATEGORY_POOL).id;
+    // Phase 8b — general-upgrade skill nodes can nudge these reward pools;
+    // applySkillTreePoolNudge is a no-op (returns the same array reference)
+    // until such a node exists. See achievements/skilltree.js.
+    const cat = Util.weighted(applySkillTreePoolNudge(COMMON_CATEGORY_POOL, 'COMMON_CATEGORY_POOL')).id;
     if (cat === 'penny') {
-      const coin = Util.weighted(COMMON_PENNY_POOL).id;
+      const coin = Util.weighted(applySkillTreePoolNudge(COMMON_PENNY_POOL, 'COMMON_PENNY_POOL')).id;
       // cursedpenny is a plain Pickup kind, not one of the COIN_TYPES tiers
       spawnResolvedPickup(node, coin === 'cursedpenny' ? 'cursedpenny' : 'coin:' + coin, spot.x, spot.y);
     } else if (cat === 'heart') {
-      spawnResolvedPickup(node, Util.weighted(COMMON_HEART_POOL).id, spot.x, spot.y);
+      spawnResolvedPickup(node, Util.weighted(applySkillTreePoolNudge(COMMON_HEART_POOL, 'COMMON_HEART_POOL')).id, spot.x, spot.y);
     } else if (cat === 'bomb') {
-      spawnResolvedPickup(node, Util.weighted(BOMB_TIER_POOL.filter(t => !t.locked || isPickupKindUnlocked(t.id))).id, spot.x, spot.y);
+      // filter (locked-kind gate) happens BEFORE the nudge clone, since
+      // applySkillTreePoolNudge's clone only carries {id,w} and would drop
+      // the `locked` flag the filter below depends on — see skilltree.js.
+      spawnResolvedPickup(node, Util.weighted(applySkillTreePoolNudge(BOMB_TIER_POOL.filter(t => !t.locked || isPickupKindUnlocked(t.id)), 'BOMB_TIER_POOL')).id, spot.x, spot.y);
     } else {
-      spawnResolvedPickup(node, Util.weighted(KEY_TIER_POOL.filter(t => !t.locked || isPickupKindUnlocked(t.id))).id, spot.x, spot.y);
+      spawnResolvedPickup(node, Util.weighted(applySkillTreePoolNudge(KEY_TIER_POOL.filter(t => !t.locked || isPickupKindUnlocked(t.id)), 'KEY_TIER_POOL')).id, spot.x, spot.y);
     }
     return;
   }
@@ -1090,12 +1155,12 @@ function spawnClearRoomPickup(game){
     // tier's bomb/key rolls already do above.
     const candidates = RARE_POOL.filter(t => !ACHIEVEMENT_PICKUP_KINDS.includes(t.id) || isPickupKindUnlocked(t.id));
     if (!candidates.length) return;
-    spawnResolvedPickup(node, Util.weighted(candidates).id, spot.x, spot.y);
+    spawnResolvedPickup(node, Util.weighted(applySkillTreePoolNudge(candidates, 'RARE_POOL')).id, spot.x, spot.y);
     return;
   }
 
   // tier === 'legendary'
-  const leg = Util.weighted(LEGENDARY_POOL).id;
+  const leg = Util.weighted(applySkillTreePoolNudge(LEGENDARY_POOL, 'LEGENDARY_POOL')).id;
   if (leg === 'trinket') {
     const trinket = pickTrinketFromPool();
     // equipTrinket/addFamiliar handle their own sound + toast + float text
@@ -1106,5 +1171,5 @@ function spawnClearRoomPickup(game){
     if (familiar) { addFamiliar(game, familiar); return; }
   }
   // leg === 'chest', or the trinket/familiar pool was empty (nothing unlocked yet)
-  node.chests.push(new Chest(Util.weighted(CHEST_TYPE_POOL).id, spot.x, spot.y));
+  node.chests.push(new Chest(Util.weighted(applySkillTreePoolNudge(CHEST_TYPE_POOL, 'CHEST_TYPE_POOL')).id, spot.x, spot.y));
 }

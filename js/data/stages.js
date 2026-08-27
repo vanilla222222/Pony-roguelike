@@ -38,7 +38,109 @@ const STAGES = [
       doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#180705', accent:'#e0592f',
     },
   },
+  /* ---------------------------------------------------------------
+     Phase 10 — the main route's ten NEW stages (indices 4-13), twenty
+     floors past what used to be the finale (see OLD_MAIN_ROUTE_FINAL_FLOOR
+     below). These are THEME/PALETTE scaffolding only: their enemy/boss
+     rosters are a later content phase, and until those land the new floors
+     draw from the generic fallback pools room.js already uses for any
+     floorKey with no roster of its own.
+
+     The arc runs cold desert -> broken badlands -> shoreline -> open water
+     -> progressively deeper sea -> lightless depths -> outside the game's
+     own fiction (Meta Realm) -> Hyperspace. Palettes follow the same
+     "darker/more saturated the deeper it goes" rule the 9-15 palettes do,
+     with the two final stages breaking to unnatural hues on purpose.
+     --------------------------------------------------------------- */
+  {
+    id:'frozendesert', name:'The Frozen Desert',
+    palette: {
+      floorA:'#8fa4b0', floorB:'#9cb2be', wall:'#5c707c', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#3c4c56', accent:'#e8f4ff',
+    },
+  },
+  {
+    id:'badlands', name:'The Badlands',
+    palette: {
+      floorA:'#5a3a2a', floorB:'#674433', wall:'#3a2519', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#241610', accent:'#d98a4a',
+    },
+  },
+  {
+    id:'beach', name:'The Beach',
+    palette: {
+      floorA:'#d8c89a', floorB:'#e2d4a8', wall:'#9a8a5e', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#6e6040', accent:'#4fc8e0',
+    },
+  },
+  {
+    id:'ocean', name:'The Ocean',
+    palette: {
+      floorA:'#1e5a78', floorB:'#246a8a', wall:'#123a50', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#0a2230', accent:'#7fe8ff',
+    },
+  },
+  {
+    id:'seafloor', name:'The Sea Floor',
+    palette: {
+      floorA:'#1a4054', floorB:'#204c62', wall:'#0e2836', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#061620', accent:'#8ad4b0',
+    },
+  },
+  {
+    id:'trench', name:'The Trench',
+    palette: {
+      floorA:'#122c40', floorB:'#16344c', wall:'#081a28', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#040e16', accent:'#4fa8d8',
+    },
+  },
+  {
+    id:'trenchdepths', name:'The Trench Depths',
+    palette: {
+      floorA:'#0c1c2e', floorB:'#102338', wall:'#050f1c', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#02070e', accent:'#3f7fc0',
+    },
+  },
+  {
+    id:'deepdark', name:'The Deep Dark',
+    palette: {
+      floorA:'#080a12', floorB:'#0c0e18', wall:'#04050a', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#010204', accent:'#2f5f8a',
+    },
+  },
+  {
+    id:'metarealm', name:'The Meta Realm',
+    palette: {
+      floorA:'#1c1230', floorB:'#241740', wall:'#0e0820', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#050310', accent:'#00ffa8',
+    },
+  },
+  {
+    id:'hyperspace', name:'Hyperspace',
+    palette: {
+      floorA:'#12082a', floorB:'#180c38', wall:'#08041a', voidC:'#000',
+      doorOpen:'#4a3320', doorLocked:'#26201a', grout:'#03010c', accent:'#ff4fd8',
+    },
+  },
 ];
+// stage id -> audio.js MUSIC_TRACKS id, for game.js's startFloor. Deliberately
+// a separate small table rather than a `music` field on STAGES itself — most
+// stages don't have a track yet, and this keeps "no track for this stage"
+// (fall through to Sound.stopMusic()) a simple missing-key lookup rather
+// than every STAGES entry needing an explicit `music:null`. Extend this as
+// each stage gets a track (see audio.js's MUSIC_TRACKS for the tracks
+// themselves).
+const STAGE_MUSIC_TRACKS = {
+  crypt:'crypt', forest:'forest', desert:'desert', inferno:'inferno',
+  frozendesert:'frozendesert', badlands:'badlands', beach:'beach', ocean:'ocean',
+  seafloor:'seafloor', trench:'trench', trenchdepths:'trenchdepths', deepdark:'deepdark',
+  metarealm:'metarealm', hyperspace:'hyperspace',
+};
+// How many STAGES entries existed BEFORE Phase 10's ten new stages. The
+// pre-existing floors 1-15 must keep resolving to exactly the stage they
+// always did, so stageIndexForFloor() clamps to this (not STAGES.length)
+// for anything at or below OLD_MAIN_ROUTE_FINAL_FLOOR.
+const LEGACY_STAGE_COUNT = 4;
 // stages bestiary (see bestiary.js) — same flat {id,name,icon,desc} shape as
 // PICKUP_TYPE_LIST/ROOM_TYPE_LIST (data.js), just kept here next to STAGES
 // itself instead of data.js. The C-branch has no stage of its own (it uses
@@ -101,8 +203,36 @@ const FLOOR_NAMES = [
   // Descent moved down two floors to index 14 and is otherwise unchanged.
   'The Hollow Chorus', 'The Final Waveform',
   'The One True Descent',
+  // ---- Phase 10 — twenty NEW main-route floors (index 15-34), two per new
+  // STAGES entry (indices 4-13 above). Scaffolding only: no rosters yet.
+  // Everything at or below index 14 is untouched, and floorNum 14 remains
+  // where descend() still ends a main-route run until a later phase extends
+  // it — see OLD_MAIN_ROUTE_FINAL_FLOOR below.
+  'Frozen Desert — Rime Flats', 'Frozen Desert — The Drifts',
+  'Badlands — Cracked Mesa', 'Badlands — The Rust Gulch',
+  'Beach — Bleached Shore', 'Beach — The Tideline',
+  'Ocean — The Shelf', 'Ocean — Open Water',
+  'The Sea Floor — Silt Plains', 'The Sea Floor — The Wreck Field',
+  'Trench — The Descent Wall', 'Trench — Cold Seep',
+  'Trench Depths — Crush Zone', 'Trench Depths — The Black Vents',
+  'Deep Dark — No Light Reaches', 'Deep Dark — The Long Quiet',
+  'Meta Realm — Behind The Curtain', 'Meta Realm — The Author\'s Margin',
+  'Hyperspace — Fold', 'Hyperspace — The Last Exit',
 ];
 const MAX_FLOORS = FLOOR_NAMES.length; // absolute ceiling — floors 9-12 (index 8-11) are branches, floors 13/14 (index 12/13) are linear, floor 15 (index 14) is the finale, see game.js
+// The main route's LAST floor before Phase 10 appended twenty more — floorNum
+// 14, "The One True Descent". Everything that must behave exactly as it did
+// before that append (stageIndexForFloor's clamp, dungeon.js's floorfeature
+// gate, game.js's C-path unlock grant) keys off this constant rather than a
+// literal 14, so the boundary can never drift out of sync.
+const OLD_MAIN_ROUTE_FINAL_FLOOR = 14;
+// The main route's TRUE last floor after the Phase 10 append — floorNum 34,
+// "Hyperspace — The Last Exit" (HUD floor 35). Derived from MAX_FLOORS so it
+// tracks FLOOR_NAMES automatically. This, and ONLY this, is what ends a Main
+// path run now: game.js's descend() continues past OLD_MAIN_ROUTE_FINAL_FLOOR
+// instead of winning there (the unlockPath('C') grant still fires at that
+// older boundary, it just no longer coincides with the run's end).
+const MAIN_ROUTE_FINAL_FLOOR = MAX_FLOORS - 1;
 
 /* ---------------------------------------------------------------
    THE C-BRANCH — a whole alternate run, entered from a gate room that
@@ -166,7 +296,18 @@ function floorNameFor(floorNum, floorPath){
   return FLOOR_NAMES[floorNum];
 }
 
-function stageIndexForFloor(floorNum){ return Math.min(STAGES.length - 1, Math.floor(floorNum / FLOORS_PER_STAGE)); }
+// Phase 10 — two ranges, deliberately kept separate so nothing about the
+// original floors changed. floorNum <= OLD_MAIN_ROUTE_FINAL_FLOOR resolves
+// EXACTLY as it always did (clamped to the last of the original four stages,
+// which is why floors 7-15 all still report the Inferno here — floors 9-15
+// never used this function for their palette, they have their own tables).
+// Past that boundary the same 2-floors-per-stage arithmetic continues into
+// the new stage range 4-13, offset from the first new floor.
+function stageIndexForFloor(floorNum){
+  if (floorNum <= OLD_MAIN_ROUTE_FINAL_FLOOR) return Math.min(LEGACY_STAGE_COUNT - 1, Math.floor(floorNum / FLOORS_PER_STAGE));
+  const offset = floorNum - (OLD_MAIN_ROUTE_FINAL_FLOOR + 1);
+  return Math.min(STAGES.length - 1, LEGACY_STAGE_COUNT + Math.floor(offset / FLOORS_PER_STAGE));
+}
 
 // floorNum 8-11 (9A/9B, 10A/10B, 11A/11B, 12A/12B) can't be told apart by stageIndexForFloor
 // alone — same floorNum, different branch — so anything that needs to pick
@@ -288,6 +429,19 @@ function cPaletteFor(floorNum){
   if (floorNum <= 9) return C_PALETTES.rainforest; // 7C, 8C, 9C, 10C
   return C_PALETTES.mangroves;                     // 11C, 12C
 }
+// C-branch background music — the audio equivalent of C_PALETTES/
+// cPaletteFor above: one audio.js MUSIC_TRACKS id per region, same four
+// region names and the same floorNum split as cPaletteFor (kept as two
+// separate lookups, exactly like STAGE_MUSIC_TRACKS is separate from
+// STAGES, rather than folding music into C_PALETTES itself). See
+// game.js's startFloor for the call site.
+const C_MUSIC_TRACKS = { gutters:'gutters', sewers:'sewers', rainforest:'rainforest', mangroves:'mangroves' };
+function cMusicTrackFor(floorNum){
+  if (floorNum <= 3) return C_MUSIC_TRACKS.gutters;    // 3C, 4C
+  if (floorNum <= 5) return C_MUSIC_TRACKS.sewers;     // 5C, 6C
+  if (floorNum <= 9) return C_MUSIC_TRACKS.rainforest; // 7C, 8C, 9C, 10C
+  return C_MUSIC_TRACKS.mangroves;                     // 11C, 12C
+}
 
 /* D-branch palettes (Phase 7a) — three regions across floorNum 3-9 (4D-10D),
    flat objects in the same shape as C_PALETTES (no A/B split: floorBranch is
@@ -318,6 +472,16 @@ function dPaletteFor(floorNum){
   if (floorNum <= 4) return D_PALETTES.observatory; // 4D, 5D
   if (floorNum <= 6) return D_PALETTES.orrery;      // 6D, 7D
   return D_PALETTES.voidbetween;                    // 8D, 9D, 10D
+}
+// D-branch background music — the audio equivalent of D_PALETTES/
+// dPaletteFor above, same shape as C_MUSIC_TRACKS/cMusicTrackFor: one
+// audio.js MUSIC_TRACKS id per region, same three region names and the
+// same floorNum split as dPaletteFor. See game.js's startFloor.
+const D_MUSIC_TRACKS = { observatory:'observatory', orrery:'orrery', voidbetween:'voidbetween' };
+function dMusicTrackFor(floorNum){
+  if (floorNum <= 4) return D_MUSIC_TRACKS.observatory; // 4D, 5D
+  if (floorNum <= 6) return D_MUSIC_TRACKS.orrery;      // 6D, 7D
+  return D_MUSIC_TRACKS.voidbetween;                    // 8D, 9D, 10D
 }
 
 /* Floors 13 and 14 (floorNum 12/13) — Phase 7a's two new linear main-route

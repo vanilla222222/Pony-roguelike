@@ -18,6 +18,7 @@ const SHOP_PICKUP_PRICES = [
   { kind:'star', price:7 },  // a star is always a known, always-useful effect — a pill is a gamble
   { kind:'sack', price:8 },
   { kind:'battery', price:9 },
+  { kind:'trashbag', price:10 }, // Phase 16 — see combat-2.js's grantPickupEffect 'trashbag' case
 ];
 
 /* ---------------------------------------------------------------
@@ -63,7 +64,7 @@ const CHEST_TYPE_POOL = [
 // top tier split — sums to 1.0. Rolled first, then the matching pool below
 // decides what actually drops. Fortune Shell shifts some `nothing` into
 // `legendary` (see room.js spawnClearRoomPickup).
-const CLEAR_REWARD_CHANCE = { nothing:0.15, common:0.65, rare:0.15, legendary:0.05 };
+const CLEAR_REWARD_CHANCE = { nothing:0.10, common:0.73, rare:0.15, legendary:0.02 };
 
 // common tier — first a category, then that category's own tier pool.
 // (bomb/key reuse the shared BOMB_TIER_POOL/KEY_TIER_POOL above.)
@@ -95,6 +96,7 @@ const RARE_POOL = [
   { id:'star', w:20 },
   { id:'sack', w:20 },
   { id:'battery', w:15 },
+  { id:'trashbag', w:12 }, // Phase 16 — NOT in ACHIEVEMENT_PICKUP_KINDS, so always eligible here
 ];
 // legendary tier — a chest (rolled against CHEST_TYPE_POOL) or a direct
 // trinket/familiar grant, same helpers a chest's bonus prize uses
@@ -160,3 +162,22 @@ const ROOM_TYPE_LIST = [
   { id:'shrine', name:'Shrine', icon:'🕯️', desc:'Offers a blessing for a price paid in coins, not hearts.' },
   { id:'arcade', name:'Arcade', icon:'🎰', desc:'Costs 1 coin at the door. Feed fillies and machines inside for gambled rewards.' },
 ];
+// room-type id -> audio.js MUSIC_TRACKS id, for game.js's enterRoom — the
+// room-scoped equivalent of stages.js's STAGE_MUSIC_TRACKS: overrides the
+// floor's own background track for as long as the player is standing in a
+// room of that type, then restores the floor track on leaving. Several
+// room types deliberately SHARE a track (crystal+shrine both being a
+// blessing paid differently; sombra+curse both a costly deal; secret+
+// sacrifice both a hidden/risky payoff; shop+petshop both a spend-coins
+// stop) rather than each getting its own — see the individual MUSIC_TRACKS
+// entries in audio.js for why each pairing makes sense. Any room type with
+// no entry here (normal, start, vault, challenge, star, the two gate
+// rooms, arcade) just keeps playing the floor's track uninterrupted.
+const ROOM_MUSIC_TRACKS = {
+  boss:'bossroom',
+  crystal:'crystalroom', shrine:'crystalroom',
+  sombra:'sombraroom', curse:'sombraroom',
+  treasure:'treasureroom',
+  secret:'secretroom', sacrifice:'secretroom',
+  shop:'shoproom', petshop:'shoproom',
+};

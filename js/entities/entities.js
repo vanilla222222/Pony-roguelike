@@ -28,14 +28,56 @@ class Player {
     this.chargeTimer = 0;
     this.chargeTime = def.chargeTime || 0;
     this.crystalVolley = !!def.crystalVolley; // Crystal Pony — see combat.js playerCrystalVolleyAttack
+    // Phase 8b-uniquefx shadow fields — per-instance copies of a knob that
+    // used to be hardcoded in combat.js, so a skilltree.js `uniqueField`
+    // node can add a bonus onto it WITHOUT ever writing back onto
+    // `player.def` (a direct reference to the shared CLASSES[classId]
+    // object — mutating it would permanently corrupt that class for every
+    // future run/character, see skilltree.js's applySkillTreeUniqueFieldBonuses).
+    // Number of shards Crystal Pony's charged volley fires — was a fixed
+    // 3-element CRYSTAL_VOLLEY_OFFSETS array in combat-2.js; only seeded
+    // (non-zero) for classes that actually have crystalVolley.
+    this.crystalShardCount = def.crystalVolley ? 3 : 0;
+    // Same deal for the SPREAD of that volley — the px gap between adjacent
+    // shard start points, previously the fixed CRYSTAL_VOLLEY_SPACING constant
+    // read straight out of combat-2.js. Seeded from
+    // CRYSTAL_VOLLEY_SPACING_DEFAULT (combat-2.js) only for classes that
+    // actually have crystalVolley, so a uniqueField node can widen or tighten
+    // the fan without touching the shared class def.
+    this.crystalVolleySpacing = def.crystalVolley ? CRYSTAL_VOLLEY_SPACING_DEFAULT : 0;
     this.greenFireAttack = !!def.greenFireAttack; // Changeling — see combat.js updateGreenFireAttack
     this.fireZone = null; // {x, y, radius} while the Changeling holds attack, null otherwise
+    // the speed multiplier applied while standing in her own fire zone
+    // (miredInOwnFire in combat-1.js's updatePlayer) — was a hardcoded 0.25
+    // constant; per-instance now so a uniqueField node can tune it (see the
+    // shadow-field note above crystalShardCount)
+    this.fireZoneRootMult = 0.25;
+    // Phase 8c-2 shadow fields — Changeling's held fire-zone pool size/reach,
+    // previously read live as `player.def.fireZoneRadius || 50` /
+    // `player.def.fireZoneRange || 40` in combat-1.js's updateGreenFireAttack
+    // (a read-only, no-mutation-risk pattern, but with no per-instance field
+    // for a uniqueField node to add onto — see the audit's "not yet shadowed"
+    // list). Seeded from the same def fields/fallbacks so behavior is
+    // unchanged until a skilltree node actually targets one.
+    this.fireZoneRadius = def.fireZoneRadius || 50;
+    this.fireZoneRange = def.fireZoneRange || 40;
     // Changedling — an always-on version of the fire zone above that follows
     // her instead of staying anchored; reuses the SAME fireZone field
     // (only one of greenFireAttack/innateFireRing is ever true for a given
     // class) — see combat.js updateFireRingAttack
     this.innateFireRing = !!def.innateFireRing;
+    // Phase 8c-2 shadow field — Changedling's (or, via a uniqueFlag node,
+    // Alicorn's) fire-ring radius; was `player.def.fireRingRadius || 60` in
+    // combat-1.js's updateFireRingAttack, same shadow-field treatment as
+    // fireZoneRadius/fireZoneRange above.
+    this.fireRingRadius = def.fireRingRadius || 60;
     this.shockwaveAttack = !!def.shockwaveAttack; // Diamond Dog — her melee swing shatters rocks too, see combat.js playerMeleeAttack
+    // Phase 8c-2 shadow field — Diamond Dog's (or, via a uniqueFlag node,
+    // Earth Pony's) flat chance for a shockwave-shattered rock to pay out a
+    // coin; was `player.def.rockCoinChance || 0` in combat-1.js's
+    // shatterRockByShockwave, same shadow-field treatment as above. Defaults
+    // to 0 for every class without the def field, exactly as before.
+    this.rockCoinChance = def.rockCoinChance || 0;
     // Changeling Queen — periodically summons small changeling minions that
     // each run their own miniature fire-zone tick, see combat.js
     // updateChangelingSummons
@@ -49,6 +91,20 @@ class Player {
     // combat.js updateTurretBuild / main.js's input.build
     this.canBuildTurrets = !!def.canBuildTurrets;
     this.turretBuildTimer = 0;
+    // Phase 8c-2 shadow fields — Engineer Pony's turret knobs, previously
+    // hardcoded constants inline in combat-1.js's updateTurretBuild
+    // (`dmg: player.rangedDamage * 0.7`) and updatePlayerTurrets's caller
+    // (`node.playerTurrets.length >= 3`). Per-instance now so uniqueField
+    // nodes can tune them; every other class simply never sets
+    // canBuildTurrets true, so these stay unused no-ops for them.
+    this.turretDamageMult = 0.7;
+    this.maxTurrets = 3;
+    // Phase 8c-2 shadow field — Pony Bot's fragility multiplier, previously
+    // read live as `(game.player.def && game.player.def.damageTakenMult) ||
+    // 1` in combat-1.js's playerDamageAmount (explicitly called out in the
+    // Phase 8b-uniquefx audit as read-only/unshadowed). Seeded from the same
+    // def field/fallback, defaults to 1 (no change) for every other class.
+    this.damageTakenMult = def.damageTakenMult || 1;
     this.unlimitedRange = !!def.unlimitedRange; // Breezie — see combat.js playerRangedAttack; bolts only ever stop at a wall
     // "layered attacks" pass — item-granted secondary/tertiary attack
     // effects, rebuilt every recalcPlayerStats from owned items' data.js
@@ -197,6 +253,12 @@ class Player {
     if (this.shieldHits > 0) { this.shieldHits--; Sound.play('shieldBlock'); return; }
     if (this.dodgeChance && Math.random() < this.dodgeChance) { Sound.play('dodge'); return; }
     Sound.play('playerHurt');
+    // Phase 13 visual pass (batch 1) — stamped on every hit that actually
+    // lands (past invuln/shield/dodge above); ui.js updateHUD diffs this
+    // against its own cache and retriggers the #canvasWrap hit-flash class.
+    // Date.now() rather than a boolean so two hits in the same HUD-diff
+    // window still count as "changed" and each gets its own flash.
+    this._hitFlashAt = Date.now();
     // Eternal Heart is spent by the first hit that isn't soaked by blue
     // hearts — checked here, past invuln/shield/dodge (so only a hit that
     // really lands counts) and BEFORE blue is drained below, so blueCurrent
@@ -295,6 +357,14 @@ class Player {
 
 class Enemy {
   constructor(type, tx, ty, floorNum){
+    // Phase 10 difficulty rebalance — growth.js's stage-keyed multiplier layer.
+    // stageTunedType hands back a COPY of the type with its `*Cooldown` fields
+    // shortened (the ai-*.js functions read those off the type object, not off
+    // the instance), and returns the original object by reference on stages 0-1
+    // where the multiplier is exactly 1. See growth.js for the curve and why.
+    const stageMult = (typeof stageDifficultyMult === 'function') ? stageDifficultyMult(floorNum) : 1;
+    const stageAggro = (typeof stageAggressionMult === 'function') ? stageAggressionMult(floorNum) : 1;
+    if (typeof stageTunedType === 'function') type = stageTunedType(type, floorNum);
     this.type = type;
     this.name = type.name;
     this.x = tileToPx(tx); this.y = tileToPx(ty);
@@ -309,11 +379,16 @@ class Enemy {
     // FACTOR on the floor curve, never a replacement for it, and it only
     // ever touches enemy hp/dmg — no player stat reads this.
     const diffMult = (typeof difficultyStatMult === 'function') ? difficultyStatMult() : 1;
-    this.hp = Math.max(1, Math.round(type.hp * enemyHpScale(floorNum) * diffMult));
+    this.hp = Math.max(1, Math.round(type.hp * enemyHpScale(floorNum) * stageMult * diffMult));
     this.maxHp = this.hp;
-    this.dmg = Math.max(1, Math.round(type.dmg * diffMult)); // half-hearts — see combat.js's playerDamageAmount
+    // trash dmg takes only a SHARE of the stage multiplier (growth.js's
+    // stageDamageMult) — it is the one number here that is still well under
+    // combat-1.js's 4-heart cap, so a nudge here actually lands, but hearts are
+    // the harshest resource in the game to inflate.
+    const stageDmg = (typeof stageDamageMult === 'function') ? stageDamageMult(floorNum) : 1;
+    this.dmg = Math.max(1, Math.round(type.dmg * stageDmg * diffMult)); // half-hearts — see combat.js's playerDamageAmount
     this.isChampion = false; // set post-population by room.js — doubled hp/dmg, bonus death drop. Bosses never get it.
-    this.speed = type.speed;
+    this.speed = type.speed * stageAggro;
     this.flies = !!type.flies;
     this.behavior = type.behavior;
     this.color = type.color; this.dark = type.dark;
@@ -426,7 +501,13 @@ class Boss extends Enemy {
     // Difficulty is re-applied here for the same reason prevHp is: Enemy's
     // constructor already put dmg on the difficulty factor, but the hp it
     // computed came off the *enemy* curve and is thrown away below.
-    this.hp = Math.max(1, Math.round(type.hp * bossHpScale(floorNum) * ((typeof difficultyStatMult === 'function') ? difficultyStatMult() : 1)));
+    // Same stage-keyed multiplier the Enemy constructor applied — recomputed
+    // rather than passed down, because super() already ran and threw away the
+    // hp it derived from the *enemy* curve. Bosses have to climb in lockstep
+    // with trash or they fall behind it stage by stage. Their `speed` and
+    // `*Cooldown` fields were already tuned by super().
+    const bossStageMult = (typeof stageDifficultyMult === 'function') ? stageDifficultyMult(floorNum) : 1;
+    this.hp = Math.max(1, Math.round(type.hp * bossHpScale(floorNum) * bossStageMult * ((typeof difficultyStatMult === 'function') ? difficultyStatMult() : 1)));
     this.maxHp = this.hp;
     // bosses now ALSO get real floor-scaled damage (see enemies.js's
     // bossDmgScale) — Enemy's constructor already set this.dmg off the flat,
@@ -445,6 +526,29 @@ class Boss extends Enemy {
     this.telegraph = 0;
     this.shielded = false;
     this.enraged = false;
+  }
+}
+
+// Phase 15 — the "miniboss" room's occupant. Sits deliberately BETWEEN Enemy
+// and Boss: tougher and more dangerous than any trash mob, but not a real
+// Boss — it does NOT set isBoss (so it never hijacks the big top-of-screen
+// boss health bar, never bumps `bossesKilled`, never fires game.onBossDefeated,
+// and the Phase 14 facing-flip/hit-squash/breathing treatment in
+// utils-2.js's drawBrownHumanoid still applies to it exactly like trash,
+// since that logic is keyed off `!isBoss`). Uses its own gentler-than-boss
+// growth curve (growth.js's minibossHpScale/minibossDmgScale) — see
+// MINIBOSS_TYPES' header comment in data/enemies/minibosses.js for the
+// stat-band reasoning.
+class Miniboss extends Enemy {
+  constructor(type, tx, ty, floorNum){
+    super(type, tx, ty, floorNum);
+    this.isMiniboss = true;
+    const mbStageMult = (typeof stageDifficultyMult === 'function') ? stageDifficultyMult(floorNum) : 1;
+    this.hp = Math.max(1, Math.round(type.hp * minibossHpScale(floorNum) * mbStageMult * ((typeof difficultyStatMult === 'function') ? difficultyStatMult() : 1)));
+    this.maxHp = this.hp;
+    this.dmg = Math.max(1, Math.round(type.dmg * minibossDmgScale(floorNum) * ((typeof difficultyStatMult === 'function') ? difficultyStatMult() : 1)));
+    this.prevHp = this.hp;
+    this.name = type.name;
   }
 }
 

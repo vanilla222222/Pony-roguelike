@@ -356,5 +356,17 @@ Object.assign(FAMILIAR_TYPES, {
     dmg:2, radius:50, orbitSpeed:2.2, contactCooldown:0.55, unlockedBy:'slayer_hulkmarksman_t3', desc:'A drifting sight-scope that lines up every shot exactly like the marksman it was salvaged from.' },
   coldstarwisp: { id:'coldstarwisp', name:'Cold Star Wisp', icon:'🕊️', color:'#9ab8ff', locked:true, behavior:'orbiter',
     dmg:1, radius:46, orbitSpeed:2, contactCooldown:0.6, unlockedBy:'challenge_voidbetween_8d_untouched', desc:'Trails behind you, marking the whole descent through the cold drift that never once drew blood.' },
+
+  /* ---- Phase 7h (cont.) capstone familiars (js/achievements/defs-12.js) —
+     orbiter behavior, same shape as the existing familiars-1.js/-2.js
+     batches. ---- */
+  nightmarksmandrone: { id:'nightmarksmandrone', name:'Night Marksman Drone', icon:'🎯', color:'#242236', locked:true, behavior:'orbiter',
+    dmg:2, radius:50, orbitSpeed:2.2, contactCooldown:0.55, unlockedBy:'slayer_nightmarksman_t3', desc:'A drifting night-sight that lines up every shot exactly like the marksman it was salvaged from.' },
+  gravmarksmandrone: { id:'gravmarksmandrone', name:'Grav Marksman Drone', icon:'🎯', color:'#0e0e18', locked:true, behavior:'orbiter',
+    dmg:2, radius:52, orbitSpeed:2.3, contactCooldown:0.5, unlockedBy:'slayer_gravmarksman_t3', desc:'A drifting optic heavy enough to bend its own shots straight, taken from the region\'s deadliest sniper.' },
+  horizonwisp: { id:'horizonwisp', name:'Horizon Wisp', icon:'🕊️', color:'#c4d0ff', locked:true, behavior:'orbiter',
+    dmg:1, radius:46, orbitSpeed:2, contactCooldown:0.6, unlockedBy:'challenge_voidbetween2_untouched_run', desc:'Trails behind you, marking the whole descent to the event horizon that never once drew blood.' },
+  singularitywisp: { id:'singularitywisp', name:'Singularity Wisp', icon:'🌌', color:'#2a3a7a', locked:true, behavior:'orbiter',
+    dmg:2, radius:48, orbitSpeed:2.6, contactCooldown:0.6, unlockedBy:'collection_voidbetween2_grand', desc:'Every ember, hull, and collapsing star of the Void Between folded into one small orbiting point of light.' },
 });
 const FAMILIAR_LIST = Object.values(FAMILIAR_TYPES);

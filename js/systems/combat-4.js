@@ -81,6 +81,31 @@ function updateObstacles(game, dt){
         if (ob.kind === 'spike') triggerSacrificeSpike(game, node, ob);
       }
     }
+    // Phase 18 — fire now burns enemies too, not just the player. Scoped to
+    // fire kinds specifically (kind containing 'fire' — every yellow/red/
+    // blue/purple/green/white/black variant, present and future) rather
+    // than every hazard (a cactus/spiketrap/thornbush staying player-only
+    // was a deliberate ask, fire wasn't). Flying trash/familiars pass over
+    // it the same way they already pass over every other ground hazard
+    // (see combat-1.js's collidesAt flying check) — a flame licking at
+    // ankles it doesn't have shouldn't tick it. Bosses are NOT excluded:
+    // walking a boss into an obstacle is already possible and this doesn't
+    // make it any more so. Depth-scaled via statusTickDamage, same reason
+    // poison/blast damage are (see updateStatusEffects/explodeAt) — a flat
+    // 1 stops meaning anything once enemy HP starts compounding.
+    if (ob.isHazard && ob.kind.indexOf('fire') !== -1) {
+      for (const e of node.enemies) {
+        if (e.isDead || e.flies || e.canFly) continue;
+        if (e.fireContactTimer === undefined) e.fireContactTimer = 0;
+        if (e.fireContactTimer > 0) { e.fireContactTimer -= dt; continue; }
+        const err = ob.radius + e.radius;
+        if (Util.dist2(ob.x, ob.y, e.x, e.y) < err * err) {
+          const applied = e.takeDamage(statusTickDamage(game.dungeon.floorNum), (e.x - ob.x) * 0.03, (e.y - ob.y) * 0.03);
+          e.fireContactTimer = 0.6;
+          if (applied && e.isDead) handleEnemyDeath(game, e);
+        }
+      }
+    }
     if (ob.isFreezeTrap) {
       const rr = ob.radius + player.radius;
       if (Util.dist2(ob.x, ob.y, player.x, player.y) < rr * rr && ob.contactCooldownTimer <= 0) {
@@ -96,16 +121,34 @@ function updateObstacles(game, dt){
       if (ob.fireTimer <= 0) {
         ob.fireTimer = ob.def.fireCooldown;
         // `homing` (purplefire) makes the bolt curve toward the player — see
-        // updateProjectiles' obstacle-bolt homing branch
-        const boltOpts = { color: ob.def.boltColor || '#e05a3a', radius: 5, homing: ob.def.homing || 0 };
-        if (ob.def.angles) {
+        // updateProjectiles' obstacle-bolt homing branch. `explosive`
+        // (whitefire, Phase 15) detonates the bolt on death — see
+        // combat-3.js's detonateExplosiveProjectile, the same plumbing an
+        // Explosive Tear rides.
+        const boltOpts = { color: ob.def.boltColor || '#e05a3a', radius: 5, homing: ob.def.homing || 0, explosive: ob.def.explosiveBolt ? 1 : 0 };
+        if (ob.def.spin) {
+          // Phase 15 (blackfire) — a NEW form of shooting: never aims at
+          // all, just leaks one bolt off a steadily rotating angle, own
+          // per-obstacle spinAngle (only ever touched here). No range gate.
+          ob.spinAngle = (ob.spinAngle || 0) + 0.5;
+          fireProjectileAngle(game, ob, ob.spinAngle, 150, ob.def.dmg || 1, boltOpts);
+        } else if (ob.def.spreadShots) {
+          // Phase 15 (greenfire) — a NEW form of shooting: a fan of N bolts
+          // at once instead of one, same range-gated aim redfire uses below.
+          if (Util.dist(ob.x, ob.y, player.x, player.y) < 320) {
+            const aim = Math.atan2(player.y - ob.y, player.x - ob.x);
+            const n = ob.def.spreadShots, spread = ob.def.spreadAngle || 0.5;
+            const step = spread / (n - 1 || 1);
+            for (let i = 0; i < n; i++) fireProjectileAngle(game, ob, aim - spread / 2 + step * i, 170, ob.def.dmg || 1, boltOpts);
+          }
+        } else if (ob.def.angles) {
           // directional/pattern turrets: fixed compass direction(s), infinite range
           for (const ang of ob.def.angles) fireProjectileAngle(game, ob, ang, 170, ob.def.dmg || 1, boltOpts);
         } else if (ob.def.targeting) {
           // targeting turret: always aims at the player, infinite range
           fireProjectileAt(game, ob, player.x, player.y, 170, ob.def.dmg || 1, boltOpts);
         } else if (Util.dist(ob.x, ob.y, player.x, player.y) < 320) {
-          // redfire — the original behavior: aims at the player, but only
+          // redfire (and now whitefire) — aims at the player, but only
           // within range, so it stays a close-quarters threat
           fireProjectileAt(game, ob, player.x, player.y, 170, ob.def.dmg || 1, boltOpts);
         }

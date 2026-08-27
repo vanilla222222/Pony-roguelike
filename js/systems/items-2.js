@@ -38,8 +38,12 @@ function applyPassiveEffect(game, item){
     // Phase 7h (cont.) — Orrery capstone items (see achievements/defs-10.js)
     || item.id === 'ringwardenplating' || item.id === 'apexwardenplating' || item.id === 'geartriadcore'
     // Phase 7h (cont.) — The Void Between capstone item (see achievements/defs-11.js)
-    || item.id === 'driftwardenplate') player.grantHeartContainer(1);
-  else if (item.id === 'giantsheart' || item.id === 'saintofsuffering') player.grantHeartContainer(2);
+    || item.id === 'driftwardenplate'
+    // Phase 7h (cont.) — The Void Between PART 2 capstone items (see achievements/defs-12.js)
+    || item.id === 'darkwardenplating' || item.id === 'horizonwardenplating'
+    // Phase 8e slice 4 — Skill Tree item-unlock batch (see data/items-5.js)
+    || item.id === 'sk8i_ironclasp') player.grantHeartContainer(1);
+  else if (item.id === 'giantsheart' || item.id === 'saintofsuffering' || item.id === 'sk8i_secondheart') player.grantHeartContainer(2);
   else if ((item.id === 'witheredapple' || item.id === 'blackheart' || item.id === 'souldrain' || item.id === 'soulseller' || item.id === 'cursedwanderer'
     // 75-achievement batch (see data.js)
     || item.id === 'blacklockboxkey' || item.id === 'devilsbargainring' || item.id === 'hexbreakertalisman' || item.id === 'doomwalkerscloak' || item.id === 'sombrasownseal')
@@ -538,6 +542,43 @@ function useActiveEffect(game, item){
     }
     case 'frostflask': {
       player.invincibleTimer = Math.max(player.invincibleTimer, 5);
+      break;
+    }
+    // ---- Phase 16 — friendly fly family (see data/familiars-3.js) ----
+    case 'swarmcanister': {
+      hatchFriendlyFly(game, 'friendlybluefly');
+      hatchFriendlyFly(game, 'friendlyyellowfly');
+      break;
+    }
+    case 'waspwhistle': {
+      // Every currently-owned friendly fly (blue orbiter or yellow shooter)
+      // hits twice as hard for 10s. `f.buffMult` is read generically by
+      // familiars.js's updateOrbiterFamiliar/updateShooterFamiliar (default
+      // 1, so every other familiar in the game is unaffected) rather than
+      // this item reaching into those functions itself.
+      for (const f of player.familiars) {
+        if (f.def.id === 'friendlybluefly' || f.def.id === 'friendlyyellowfly') {
+          f.buffMult = 2; f.buffTimer = 10;
+        }
+      }
+      break;
+    }
+    case 'trashcompactor': {
+      // Consumes every friendly fly the player owns for one AoE blast —
+      // more flies in, bigger blast out. A baseline hit even at zero flies
+      // (Explosion radius 60) so the button is never a total dud the first
+      // time it's used before any flies have been hatched yet.
+      const flies = player.familiars.filter(f => f.def.id === 'friendlybluefly' || f.def.id === 'friendlyyellowfly');
+      player.familiars = player.familiars.filter(f => f.def.id !== 'friendlybluefly' && f.def.id !== 'friendlyyellowfly');
+      const R = 60 + flies.length * 24;
+      game.explosions.push(new Explosion(player.x, player.y, R));
+      for (const e of node.enemies) {
+        if (e.isDead) continue;
+        if (Util.dist(player.x, player.y, e.x, e.y) < R + e.radius) {
+          const applied = e.takeDamage(depthDmg(2 + flies.length * 2), (e.x - player.x) * 0.06, (e.y - player.y) * 0.06);
+          if (applied && e.isDead) handleEnemyDeath(game, e);
+        }
+      }
       break;
     }
   }

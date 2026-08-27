@@ -551,4 +551,87 @@ const FAMILIAR_TYPES = {
     dmg:1, cooldown:1.1, boltSpeed:230, desc:'A floating familiar that pelts enemies with icy bolts.' },
   corallark: { id:'corallark', name:'Coral Lark', icon:'🦇', color:'#c96a5a', locked:true, behavior:'shooter',
     dmg:1, cooldown:0.9, boltSpeed:300, desc:'A tiny familiar with a fast firing rate.' },
+
+  /* ================= Phase 8e (slice 3/4) — SKILL-TREE UNLOCK REWARDS =====
+     25 new familiars, `sk8f_` id-prefixed to stay collision-safe alongside
+     the parallel stars/trinkets/items slices. Each one is gated behind its
+     own leaf node under `unlock_familiars_hub` in the new
+     achievements/skilltree-unlocks-familiars.js (see there for the nodes).
+     Pure data: every field below is one familiars.js's existing
+     updateXFamiliar functions already dispatch/read — no new `behavior`
+     string, no new code. Mix: 4 orbiter / 4 shooter / 3 proc / 2 blocker /
+     2 thief / 2 grower / 2 detonator / 2 mirror / 2 scavenger / 1 berserker
+     / 1 swarmer = 25.
+     ========================================================================= */
+  // ---- orbiters (4) ----
+  sk8f_glowmoth: { id:'sk8f_glowmoth', name:'Glow Moth', icon:'🦋', color:'#b8e0ff', locked:true, behavior:'orbiter',
+    dmg:1, radius:42, orbitSpeed:3.4, contactCooldown:0.45, desc:'A pale-winged orbiting familiar that nicks anything it grazes.' },
+  sk8f_cinderclaw: { id:'sk8f_cinderclaw', name:'Cinderclaw', icon:'🦞', color:'#c9522e', locked:true, behavior:'orbiter',
+    dmg:3, radius:50, orbitSpeed:1.6, contactCooldown:0.9, desc:'A slow, heavy-clawed orbiting familiar that hits hard.' },
+  sk8f_hollowwisp: { id:'sk8f_hollowwisp', name:'Hollow Wisp', icon:'👻', color:'#9ac9e0', locked:true, behavior:'orbiter',
+    dmg:1, radius:46, orbitSpeed:2.4, contactCooldown:0.6, freezeChance:0.15, desc:'A cold, half-seen orbiting familiar with a chance to freeze what it touches.' },
+  sk8f_briarcub: { id:'sk8f_briarcub', name:'Briar Cub', icon:'🐻', color:'#8a5a3a', locked:true, behavior:'orbiter',
+    dmg:2, radius:48, orbitSpeed:2.6, contactCooldown:0.7, desc:'A thicket-born orbiting familiar that damages anything that gets close.' },
+
+  // ---- shooters (4) ----
+  sk8f_glassfinch: { id:'sk8f_glassfinch', name:'Glass Finch', icon:'🐦', color:'#c9c3ff', locked:true, behavior:'shooter',
+    dmg:1, cooldown:0.95, boltSpeed:310, desc:'A near-transparent bird familiar that fires quick, thin shots.' },
+  sk8f_tarpitcher: { id:'sk8f_tarpitcher', name:'Tar Pitcher', icon:'🛢️', color:'#4a4640', locked:true, behavior:'shooter',
+    dmg:3, cooldown:2.3, boltSpeed:230, desc:'A hunched familiar that hurls slow, heavy gobs of tar.' },
+  sk8f_dunehare: { id:'sk8f_dunehare', name:'Dune Hare', icon:'🐇', color:'#e3c15b', locked:true, behavior:'shooter',
+    dmg:1, cooldown:1.05, boltSpeed:280, desc:'A floating familiar that fires bolts at nearby enemies.' },
+  sk8f_stormlark: { id:'sk8f_stormlark', name:'Storm Lark', icon:'🐦‍⬛', color:'#7a8ac0', locked:true, behavior:'shooter',
+    dmg:2, cooldown:1.6, boltSpeed:255, desc:'A watchful familiar that snipes distant enemies with crackling bolts.' },
+
+  // ---- procs (3) ----
+  sk8f_mossykettle: { id:'sk8f_mossykettle', name:'Mossy Kettle', icon:'🫖', color:'#5ba050', locked:true, behavior:'proc',
+    procType:'heal', interval:50, amount:0.5, desc:'Every so often, mends half a heart.' },
+  sk8f_gildedpurse: { id:'sk8f_gildedpurse', name:'Gilded Purse', icon:'👛', color:'#e3c15b', locked:true, behavior:'proc',
+    procType:'coin', interval:90, amount:1, desc:'Every so often, conjures a coin.' },
+  sk8f_batterygrub: { id:'sk8f_batterygrub', name:'Battery Grub', icon:'🔋', color:'#4fd1c5', locked:true, behavior:'proc',
+    procType:'charge', interval:90, amount:1, desc:'Every so often, tops off your active item.' },
+
+  // ---- blockers (2) ----
+  sk8f_wardencub: { id:'sk8f_wardencub', name:'Warden Cub', icon:'🛡️', color:'#8a94c9', locked:true, behavior:'blocker',
+    interval:50, maxShields:1, desc:'Every so often, wraps you in a bubble that blocks one hit.' },
+  sk8f_bastionmoth: { id:'sk8f_bastionmoth', name:'Bastion Moth', icon:'🪲', color:'#5a7a9a', locked:true, behavior:'blocker',
+    interval:80, maxShields:2, desc:'Every so often, layers on a shield, up to two blocked hits.' },
+
+  // ---- thieves (2) ----
+  sk8f_ferretling: { id:'sk8f_ferretling', name:'Ferretling', icon:'🦡', color:'#8a7a5a', locked:true, behavior:'thief',
+    dmg:1, radius:40, orbitSpeed:3.6, contactCooldown:0.5, stealChance:0.12, desc:'A quick orbiting familiar that bites enemies and sometimes picks their pockets.' },
+  sk8f_ravensnatch: { id:'sk8f_ravensnatch', name:'Raven Snatch', icon:'🐦‍⬛', color:'#4a4640', locked:true, behavior:'thief',
+    dmg:2, radius:50, orbitSpeed:2.2, contactCooldown:0.75, stealChance:0.2, desc:'An orbiting familiar that hits hard and often knocks a coin loose.' },
+
+  // ---- growers (2) ----
+  sk8f_seedgrub: { id:'sk8f_seedgrub', name:'Seed Grub', icon:'🌱', color:'#6fa83a', locked:true, behavior:'grower',
+    dmg:1, radius:42, orbitSpeed:3.0, contactCooldown:0.5, killsPerGrowth:15, growthStep:0.25, maxGrowth:3, desc:'A weak orbiting familiar that grows stronger with every 15 kills this run.' },
+  sk8f_ironlarva: { id:'sk8f_ironlarva', name:'Iron Larva', icon:'🪱', color:'#7a746a', locked:true, behavior:'grower',
+    dmg:2, radius:50, orbitSpeed:1.8, contactCooldown:0.8, killsPerGrowth:25, growthStep:0.3, maxGrowth:3, desc:'A heavy orbiting familiar that hardens with every 25 kills this run.' },
+
+  // ---- detonators (2) ----
+  sk8f_sparkpod: { id:'sk8f_sparkpod', name:'Spark Pod', icon:'🧨', color:'#e05a3a', locked:true, behavior:'detonator',
+    dmg:2, interval:6, radius:70, desc:'Drifts beside you and detonates every few seconds, hurting nearby enemies.' },
+  sk8f_ashcask: { id:'sk8f_ashcask', name:'Ash Cask', icon:'💥', color:'#f4903a', locked:true, behavior:'detonator',
+    dmg:4, interval:10, radius:90, desc:'Drifts beside you and detonates in a wide, hard blast every ten seconds.' },
+
+  // ---- mirrors (2) ----
+  sk8f_focusgleam: { id:'sk8f_focusgleam', name:'Focus Gleam', icon:'🔭', color:'#7fd6c9', locked:true, behavior:'mirror',
+    dmg:1, cooldown:1.0, boltSpeed:280, range:300, arc:1.0, desc:'A floating familiar that fires at whatever you are aiming at.' },
+  sk8f_duskmirror: { id:'sk8f_duskmirror', name:'Dusk Mirror', icon:'🪞', color:'#5a4270', locked:true, behavior:'mirror',
+    dmg:2, cooldown:1.6, boltSpeed:260, range:300, arc:0.8, desc:'A floating familiar that mirrors your aim with slow, heavy bolts.' },
+
+  // ---- scavengers (2) ----
+  sk8f_packrat: { id:'sk8f_packrat', name:'Packrat', icon:'🐀', color:'#c9a35a', locked:true, behavior:'scavenger',
+    interval:2.5, radius:120, desc:'Every couple of seconds, fetches the nearest loose pickup for you.' },
+  sk8f_hoardgull: { id:'sk8f_hoardgull', name:'Hoard Gull', icon:'🕊️', color:'#c3d6e0', locked:true, behavior:'scavenger',
+    interval:1.5, radius:80, desc:'Constantly scoops up any pickup that lands close to you.' },
+
+  // ---- berserker (1) ----
+  sk8f_furyimp: { id:'sk8f_furyimp', name:'Fury Imp', icon:'👹', color:'#c94a4a', locked:true, behavior:'berserker',
+    dmg:1, radius:44, orbitSpeed:3.4, contactCooldown:0.5, berserkPower:1.5, desc:'An orbiting familiar that bites harder the closer you are to death.' },
+
+  // ---- swarmer (1) ----
+  sk8f_gnatswarm: { id:'sk8f_gnatswarm', name:'Gnat Swarm', icon:'🐝', color:'#8a7a5a', locked:true, behavior:'swarmer',
+    dmg:1, interval:6, orbCount:3, orbLife:4, orbRadius:26, orbSpeed:4.5, contactCooldown:0.5, desc:'Every few seconds, buds off three short-lived stinging orbs around itself.' },
 };

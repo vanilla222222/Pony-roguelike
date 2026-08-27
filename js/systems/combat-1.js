@@ -43,9 +43,18 @@ function playerDamageAmount(game, isBoss, dmgHalves){
   if (isBoss) amount *= game.player.bossDamageTakenMult;
   // per-class fragility (Pony Bot's damageTakenMult, see data.js CLASSES) —
   // applies to every source that routes through here: contact, hazards,
-  // bolts, bosses, explosions. Absent on every other class, so it's a no-op.
-  amount *= (game.player.def && game.player.def.damageTakenMult) || 1;
-  return Math.max(0.5, Math.round(amount * 2) / 2); // snap back onto half-heart granularity
+  // bolts, bosses, explosions. 1 (no change) on every other class, so it's a
+  // no-op. Phase 8c-2 — reads the per-instance shadow field (entities.js's
+  // Player constructor) instead of player.def directly, so a skilltree.js
+  // uniqueField node can tune it without ever writing through player.def.
+  amount *= game.player.damageTakenMult || 1;
+  // Phase 10 — GLOBAL DAMAGE CAP. No single hit, from any source (contact,
+  // hazard, bolt, boss, explosion), can ever cost more than 4 hearts, however
+  // large the attacker's `dmg` is or how many multipliers stack onto it. This
+  // is the one funnel point every damage source in the game routes through, so
+  // the cap needs no per-call-site enforcement. Applied AFTER the half-heart
+  // snap so the cap value itself stays on the HUD's granularity.
+  return Math.min(4, Math.max(0.5, Math.round(amount * 2) / 2)); // snap back onto half-heart granularity, then cap
 }
 
 // wraps Player.takeDamage with reactions that need the wider game state (the
@@ -126,7 +135,7 @@ function findClearFloorSpot(node, tx, ty){
 
 function collidesAt(entity, x, y, node, obstacles){
   const r = entity.radius;
-  const flying = !!(entity.canFly || entity.flies);
+  const flying = !!(entity.canFly || entity.flies || entity.groundless); // groundless — Earth Pony's own "Skyfurrow" mechanic (Phase 11 un-bleed pass), same terrain-crossing behavior, her own flag rather than borrowing canFly
   const pts = [[0,0],[r*0.9,0],[-r*0.9,0],[0,r*0.9],[0,-r*0.9]];
   for (const [ox, oy] of pts) {
     const tx = Math.floor((x + ox) / TILE), ty = Math.floor((y + oy) / TILE);
@@ -226,7 +235,10 @@ function updatePlayer(game, input, dt){
   // Changedling's fire ring — always on, follows her every frame, no
   // input.attack gate at all (unlike the anchored zone above). Cheap no-op
   // when the flag is off. See updateFireRingAttack below.
-  if (player.innateFireRing) updateFireRingAttack(game, dt);
+  // Phase 11 un-bleed pass — Alicorn's own `innateStarRing` and Windigo's
+  // own `innateBlizzardRing` both trigger the same ring mechanic under
+  // their own flags rather than sharing Changedling's `innateFireRing`.
+  if (player.innateFireRing || player.innateStarRing || player.innateBlizzardRing) updateFireRingAttack(game, dt);
   // Changeling Queen's summoned minions — cheap no-op when the flag is off.
   // See updateChangelingSummons below.
   updateChangelingSummons(game, dt);
@@ -255,7 +267,7 @@ function updatePlayer(game, input, dt){
   // Changedling's fire RING reuses the same fireZone field but is meant to
   // follow her at full speed, not root her in place.
   const miredInOwnFire = player.greenFireAttack && !!player.fireZone;
-  const spd = player.speed * Math.max(player.speedBoostTimer > 0 ? 1.5 : 1, player.starSpeedMult) * (onMud ? 0.5 : 1) * (miredInOwnFire ? 0.25 : 1);
+  const spd = player.speed * Math.max(player.speedBoostTimer > 0 ? 1.5 : 1, player.starSpeedMult) * (onMud ? 0.5 : 1) * (miredInOwnFire ? (player.fireZoneRootMult != null ? player.fireZoneRootMult : 0.25) : 1);
   // Sand Trap freezes movement entirely for a moment — aiming/attacking
   // still work, only stepping is locked (see the freezeTimer decrement above)
   player.moving = (mx !== 0 || my !== 0) && player.freezeTimer <= 0; // drives drawPony's walk cycle, see render.js
@@ -281,7 +293,7 @@ function updatePlayer(game, input, dt){
   // greenFireAttack/innateFireRing were already handled above (before
   // movement) — everyone else's attack still dispatches from the normal
   // press-only gate here.
-  if (!player.greenFireAttack && !player.innateFireRing) {
+  if (!player.greenFireAttack && !player.innateFireRing && !player.innateStarRing && !player.innateBlizzardRing) {
     if (input.attack) {
       if (player.attackType === 'melee') playerMeleeAttack(game);
       else if (player.charged) playerChargedBeamAttack(game, dt, input);
@@ -358,7 +370,10 @@ function shatterRockByShockwave(game, ob){
   bumpBestiaryCount('objectsDestroyed', ob.kind, 1); // see js/bestiary.js
   // NB: no 'rocksBombed' bump — she didn't bomb it, and that stat gates the
   // Diamond Dog unlock itself (see her unlockHint)
-  if (Util.chance(player.def.rockCoinChance || 0)) {
+  // Phase 8c-2 — reads the per-instance shadow field instead of player.def
+  // directly, so a skilltree.js uniqueField node can tune it (for Diamond Dog
+  // herself, or for Earth Pony via a borrowed-mechanic uniqueFlag node).
+  if (Util.chance(player.rockCoinChance || 0)) {
     node.pickups.push(new Pickup('coin', ob.tx, ob.ty, Util.weighted(COIN_TYPES)));
   }
 }
@@ -434,12 +449,14 @@ function playerRangedAttack(game){
 function updateGreenFireAttack(game, input, dt){
   const player = game.player, node = game.currentRoom;
   if (!input.attack) { player.fireZone = null; return; } // released → gone this frame, no cooldown, no fade
-  const range = player.def.fireZoneRange || 40;
+  // Phase 8c-2 — reads the per-instance shadow fields instead of player.def
+  // directly, so a skilltree.js uniqueField node can tune the pool's size/reach.
+  const range = player.fireZoneRange || 40;
   if (!player.fireZone) {
     player.fireZone = {
       x: player.x + player.facing.x * range,
       y: player.y + player.facing.y * range,
-      radius: player.def.fireZoneRadius || 50,
+      radius: player.fireZoneRadius || 50,
       tickTimer: 0,
     };
     Sound.play('rangedShot');
@@ -495,7 +512,10 @@ function updateGreenFireAttack(game, input, dt){
 // still fires for it exactly like 'firezone'.
 function updateFireRingAttack(game, dt){
   const player = game.player, node = game.currentRoom;
-  const radius = player.def.fireRingRadius || 60;
+  // Phase 8c-2 — reads the per-instance shadow field instead of player.def
+  // directly, so a skilltree.js uniqueField node can tune it (for Changedling
+  // herself, or for Alicorn via a borrowed-mechanic uniqueFlag node).
+  const radius = player.fireRingRadius || 60;
   if (!player.fireZone) {
     player.fireZone = { x: player.x, y: player.y, radius, tickTimer: 0 };
     Sound.play('rangedShot');
@@ -544,7 +564,13 @@ const CHANGELING_MINION_TICK = 0.5;
 const CHANGELING_MINION_CHASE_SPEED = 150; // px/s — a touch slower than most trash chasers, it's a fire-zone bearer not a brawler
 function updateChangelingSummons(game, dt){
   const player = game.player, node = game.currentRoom;
-  if (!player.summonsChangelings) return;
+  // Phase 11 un-bleed pass — Bat Pony (`summonsRoostmates`), Kelpie
+  // (`summonsThralls`), Changedling (`summonsBrood`), and the base
+  // Changeling (`summonsHive`) each own their own flag now rather than
+  // sharing Changeling Queen's `summonsChangelings`; all five drive this
+  // same generic orbiting-helper system, which is shared plumbing (like
+  // ranged/melee attack) rather than any one character's signature.
+  if (!player.summonsChangelings && !player.summonsRoostmates && !player.summonsThralls && !player.summonsHive && !player.summonsBrood) return;
   // spawn — one at a time, gated on both a free slot and the summon cooldown
   if (player._changelingSummonTimer > 0) player._changelingSummonTimer -= dt;
   if (player.changelingMinions.length < player.maxChangelingMinions && player._changelingSummonTimer <= 0) {
@@ -625,13 +651,20 @@ function updateChangelingSummons(game, dt){
 // field — that's the "takes their fire rate to build one" from the brief.
 function updateTurretBuild(game, dt, input){
   const player = game.player, node = game.currentRoom;
-  if (!player.canBuildTurrets) return;
+  // Phase 11 un-bleed pass — Mule (`canPlantMarkers`), Dnbpony
+  // (`canDropStacks`), Alicorn (`canConjureWards`), and Crystal Pony
+  // (`canPlantSentries`) each own their own flag now rather than sharing
+  // Engineer Pony's `canBuildTurrets`; the placement/build-channel/damage
+  // system itself is shared plumbing, same as ranged/melee attack.
+  if (!player.canBuildTurrets && !player.canPlantMarkers && !player.canDropStacks && !player.canConjureWards && !player.canPlantSentries) return;
   if (!input.build) { player.turretBuildTimer = 0; return; }
   player.turretBuildTimer += dt;
   if (player.turretBuildTimer < player.fireCooldown) return;
   player.turretBuildTimer = 0;
   if (!node.playerTurrets) node.playerTurrets = [];
-  if (node.playerTurrets.length >= 3) {
+  // Phase 8c-2 — reads the per-instance shadow field (was a hardcoded 3)
+  // so a skilltree.js uniqueField node can raise her turret cap.
+  if (node.playerTurrets.length >= player.maxTurrets) {
     Sound.play('uiDeny');
     game.toast('Maximum turrets already built.');
     return;
@@ -639,7 +672,9 @@ function updateTurretBuild(game, dt, input){
   // dmg is snapshotted at build time (player.rangedDamage * 0.7) rather than
   // read live off the player every shot — a turret is a standalone fixture
   // once placed, not something later damage-ups retroactively buff
-  node.playerTurrets.push({ x: player.x, y: player.y, sightRange: 3 * TILE, fireTimer: 0, dmg: player.rangedDamage * 0.7, ang: 0 });
+  // Phase 8c-2 — reads the per-instance shadow field (was a hardcoded 0.7)
+  // so a skilltree.js uniqueField node can raise built turrets' damage.
+  node.playerTurrets.push({ x: player.x, y: player.y, sightRange: 3 * TILE, fireTimer: 0, dmg: player.rangedDamage * player.turretDamageMult, ang: 0 });
   Sound.play('itemGet');
   bumpStat('turretsBuilt', 1, game);
 }
@@ -717,7 +752,7 @@ function playerLaserAttack(game){
     if (applied) {
       player.onHitLanded();
       Sound.play(crit ? 'crit' : 'enemyHit');
-      if (crit) bumpStat('critsLanded', 1, game);
+      if (crit) { bumpStat('critsLanded', 1, game); e._lastHitCrit = true; } // consumed once by render.js's hit-flash rising edge (drawEnemy) for a distinct crit spark burst
       applyOnHitStatuses(game, e);
       game.floatTexts.push(new FloatText(e.x, e.y - 20, (crit ? 'CRIT ' : '') + dmg, crit ? '#ffcf5c' : '#fff'));
       if (e.isDead) { bumpStat('rangedKills', 1, game); handleEnemyDeath(game, e); }

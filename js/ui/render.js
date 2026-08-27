@@ -644,7 +644,12 @@ Object.assign(Game.prototype, {
       for (let x = 0; x < node.tileW; x++) {
         const t = node.tiles[y][x];
         const px = x * TILE, py = y * TILE;
-        if (t === T_VOID) { ctx.fillStyle = pal.voidC; ctx.fillRect(px, py, TILE, TILE); continue; }
+        if (t === T_VOID) {
+          // Phase 7d: the whole D-branch hangs in space, so void/background
+          // tiles get the Planetarium's starfield instead of a flat fill.
+          if (this.floorPath === 'D') { paintStarfieldTile(ctx, px, py, x, y, pal, 0); continue; }
+          ctx.fillStyle = pal.voidC; ctx.fillRect(px, py, TILE, TILE); continue;
+        }
         if (t === T_WALL || t === T_SECRET) {
           // per-block shade variance so a wall reads as individual stones,
           // not one flat-colored grid — deterministic per tile coordinate
@@ -819,8 +824,14 @@ Object.assign(Game.prototype, {
         ctx.fillStyle = Theme.ui.onIconSoft; ctx.fillText(pickupIconChar(slot.pickup), 0, 1);
       }
       ctx.restore();
-      ctx.fillStyle = this.player.coins >= slot.price ? Theme.ui.gold : Theme.ui.goldDim;
       ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      // a thin dark keyline behind the price (Theme.shadow.outline — the
+      // same small-text/icon legibility convention used everywhere else in
+      // this game) so it stays readable over a bright floor tile, not just
+      // over the pedestal's own dark base
+      ctx.lineWidth = 3; ctx.strokeStyle = Theme.shadow.outline;
+      ctx.strokeText(slot.price + 'c', px, py + 30);
+      ctx.fillStyle = this.player.coins >= slot.price ? Theme.ui.gold : Theme.ui.goldDim;
       ctx.fillText(slot.price + 'c', px, py + 30);
     }
   },
@@ -902,27 +913,50 @@ Object.assign(Game.prototype, {
     for (const m of minions) Util.drawChangelingMinion(ctx, m, this.now);
   },
 
+  // Phase 12 visual pass — was a flat ellipse fill + thin stroke; the exit
+  // (and its branch-point cousin) is a real landmark, worth reading as "a
+  // portal beckoning you forward" rather than a plain dark oval. A radial
+  // gradient (void-dark center fading through the ring color) replaces the
+  // flat pit fill, and the ring itself now pulses via shadowBlur — same
+  // `this.now`-driven sine pulse convention used everywhere else in this
+  // file (minimap's "you are here" ring, ember glow, etc) rather than a new
+  // animation idea.
+  drawStairsPit(ctx, px, py, rx, ry, ringColor){
+    const pulse = 0.5 + Math.sin(this.now / 340) * 0.5;
+    const grad = ctx.createRadialGradient(px, py, 1, px, py, Math.max(rx, ry));
+    grad.addColorStop(0, Theme.world.pitFill);
+    grad.addColorStop(0.7, Theme.world.stairsPit);
+    grad.addColorStop(1, Util.shadeColor(ringColor, -0.5));
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = ringColor; ctx.shadowBlur = 6 + pulse * 6;
+    ctx.strokeStyle = ringColor; ctx.lineWidth = 2 + pulse * 0.6;
+    ctx.stroke();
+    ctx.restore();
+  },
+
   drawStairs(){
     const node = this.currentRoom;
     const ctx = this.ctx;
     if (node.branchSpots) {
       for (const b of node.branchSpots) {
         const px = b.x * TILE, py = b.y * TILE;
-        ctx.fillStyle = Theme.world.stairsPit;
-        ctx.beginPath(); ctx.ellipse(px, py, 24, 18, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = b.branch === 'B' ? Theme.world.branchB : Theme.world.branchA; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = ctx.strokeStyle; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(b.label, px, py + 34);
+        const ringColor = b.branch === 'B' ? Theme.world.branchB : Theme.world.branchA;
+        this.drawStairsPit(ctx, px, py, 24, 18, ringColor);
+        ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+        ctx.lineWidth = 3; ctx.strokeStyle = Theme.shadow.outline; ctx.strokeText(b.label, px, py + 34);
+        ctx.fillStyle = ringColor; ctx.fillText(b.label, px, py + 34);
       }
       return;
     }
     if (!node.stairsSpot) return;
     const px = node.stairsSpot.x * TILE, py = node.stairsSpot.y * TILE;
-    ctx.fillStyle = Theme.world.stairsPit;
-    ctx.beginPath(); ctx.ellipse(px, py, 26, 18, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = Theme.world.stairsRing; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = Theme.world.stairsRing; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(this.isLastFloorOfRun() ? 'ESCAPE' : 'DOWN', px, py + 34);
+    this.drawStairsPit(ctx, px, py, 26, 18, Theme.world.stairsRing);
+    const label = this.isLastFloorOfRun() ? 'ESCAPE' : 'DOWN';
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.lineWidth = 3; ctx.strokeStyle = Theme.shadow.outline; ctx.strokeText(label, px, py + 34);
+    ctx.fillStyle = Theme.world.stairsRing; ctx.fillText(label, px, py + 34);
   },
 
   // one pooled {y, kind, ref} record per sortable thing. The pool grows to the
@@ -943,6 +977,27 @@ Object.assign(Game.prototype, {
     const list = this._entityDrawScratch;
     list.length = 0;
     let n = 0;
+
+    // Phase 19 — Chain Rattler's tether (data/enemies/crypt-extra2.js's
+    // linkedDeath, ai-crypt2.js's 'chainlink'). Drawn first so it always
+    // sits under both bodies rather than fighting the y-sort below for
+    // draw order — it's a rope on the ground, not a thing with a height.
+    for (let i = 0; i < node.enemies.length; i++) {
+      const e = node.enemies[i];
+      if (e.isDead || !e.type.linkedDeath) continue;
+      for (let j = i + 1; j < node.enemies.length; j++) {
+        const o = node.enemies[j];
+        if (o.isDead || o.type.id !== e.type.id) continue;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = Theme.shadow.outline;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(o.x, o.y); ctx.stroke();
+        ctx.restore();
+        break;
+      }
+    }
     for (const ob of node.obstacles) {
       if (ob.destroyed || GROUND_OBSTACLES[ob.kind]) continue;
       const en = this._drawEntry(n++); en.kind = 0; en.ref = ob; en.y = ob.y; list.push(en);
@@ -981,7 +1036,12 @@ Object.assign(Game.prototype, {
     ctx.save();
     ctx.fillStyle = Theme.shadow.ground;
     ctx.beginPath(); ctx.ellipse(f.x, f.y + 9, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = f.def.color;
+    // Phase 12 visual pass — was a flat fillStyle; every other body in this
+    // game (bombs, obstacles, items, chests) uses Util.bodyShade for a lit-
+    // sphere gradient instead of a solid disc, and a familiar just hadn't
+    // been migrated onto it yet. Same signature, same call-site shape as
+    // every other user of this helper — no geometry change.
+    ctx.fillStyle = Util.bodyShade(ctx, f.x, f.y + bob, 11, f.def.color);
     ctx.beginPath(); ctx.arc(f.x, f.y + bob, 11, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = Theme.rgba(Theme.rgb.white, .35); ctx.lineWidth = 1.5; ctx.stroke();
     ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -996,7 +1056,7 @@ Object.assign(Game.prototype, {
       for (const orb of f.miniOrbs) {
         ctx.save();
         ctx.globalAlpha = Math.min(1, orb.life);
-        ctx.fillStyle = f.def.color;
+        ctx.fillStyle = Util.bodyShade(ctx, orb.x, orb.y, 5, f.def.color);
         ctx.beginPath(); ctx.arc(orb.x, orb.y, 5, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = Theme.rgba(Theme.rgb.white, .5); ctx.lineWidth = 1; ctx.stroke();
         ctx.restore();
@@ -1014,10 +1074,18 @@ Object.assign(Game.prototype, {
     if (inv > (this._fxPlayerInvuln || 0)) {
       FX.shake(4.5, 0.22);
       FX.sparks(p.x, p.y, Theme.floatText.playerHurt, 7);
+      // Phase 14 visual pass — stamped once on the same rising edge as the
+      // shake/sparks above, so the squash below is its own short (250ms)
+      // punch rather than lasting the whole (usually much longer) invuln
+      // blink window.
+      this._playerSquashAt = this.now;
     }
     this._fxPlayerInvuln = inv;
+    const squashElapsed = this.now - (this._playerSquashAt || -9999);
+    const squashT = Util.clamp(1 - squashElapsed / 250, 0, 1);
     ctx.save();
     if (p.invincibleTimer > 0) { ctx.shadowColor = Theme.status.invincibleGlow; ctx.shadowBlur = 16; }
+    if (squashT > 0) { ctx.translate(p.x, p.y); ctx.scale(1 + 0.16 * squashT, 1 - 0.16 * squashT); ctx.translate(-p.x, -p.y); }
     Util.drawPony(ctx, p.x, p.y, 34 * (p.def.sizeMult || 1), Object.assign({}, Util.classPonyOpts(p.def), {
       // p.canFly (not def.canFly) so Borrowed Wings still visually grants
       // wings to classes that can't normally fly, same as it does in play
@@ -1053,7 +1121,23 @@ Object.assign(Game.prototype, {
     // hitFlash goes up only when combat.js lands a hit, so its rising edge is
     // a free "something just connected here" signal
     const hit = e.hitFlash > 0;
-    if (hit && !e._fxHit) FX.sparks(e.x, e.y - e.radius * 0.25, Theme.particle.hitSpark, 5);
+    if (hit && !e._fxHit) {
+      // Phase 12 visual pass — a critical hit gets its own, punchier burst
+      // (Theme.particle.critSpark existed already but was never wired to
+      // anything) instead of reading identically to a normal hit: more
+      // sparks plus a quick ring of twinkle motes, both in the crit's own
+      // brighter gold-white tone. `_lastHitCrit` is set once by combat.js
+      // right where `crit` is computed (see combat-1/2/3.js) and consumed
+      // (cleared) right here on the same rising edge hitSpark already uses,
+      // so it can never leak into a later non-crit hit on the same enemy.
+      if (e._lastHitCrit) {
+        FX.sparks(e.x, e.y - e.radius * 0.25, Theme.particle.critSpark, 9);
+        FX.twinkle(e.x, e.y - e.radius * 0.25, Theme.particle.critSpark, 5);
+        e._lastHitCrit = false;
+      } else {
+        FX.sparks(e.x, e.y - e.radius * 0.25, Theme.particle.hitSpark, 5);
+      }
+    }
     e._fxHit = hit;
     // lobber landing marker — a ground-target burst is only fair if the spot
     // is visible, so the ring is drawn before (under) the body and fills as
@@ -1074,8 +1158,11 @@ Object.assign(Game.prototype, {
     // this.dpr opts into the pre-baked sprite path — see Util._humanoidSprite
     Util.drawBrownHumanoid(ctx, e, hit, this.player.passives.directglass > 0, this.now, moving, this.dpr);
     if (e.shielded && !e.submerged) {
+      ctx.save();
+      ctx.shadowColor = Theme.status.shieldRing; ctx.shadowBlur = 6;
       ctx.strokeStyle = Theme.status.shieldRing; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
     }
     this.drawStatusEffects(e);
     ctx.restore();
@@ -1085,50 +1172,117 @@ Object.assign(Game.prototype, {
     const ctx = this.ctx;
     const ringR = e.radius + 8;
     if (e.freezeTimer > 0) {
+      // Phase 12 visual pass (canvas batch) — a soft icy glow on the ring
+      // plus a couple of small glints on the frosted fill, so "frozen" reads
+      // as a shimmering ice coating rather than a flat cyan disc.
+      ctx.save();
+      ctx.shadowColor = Theme.status.freezeRing; ctx.shadowBlur = 5;
       ctx.strokeStyle = Theme.status.freezeRing; ctx.lineWidth = Theme.status.freezeWidth;
       ctx.beginPath(); ctx.arc(e.x, e.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
       ctx.fillStyle = Theme.status.freezeFill;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.beginPath(); ctx.arc(e.x - e.radius * 0.35, e.y - e.radius * 0.3, 1.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x + e.radius * 0.3, e.y + e.radius * 0.2, 1, 0, Math.PI * 2); ctx.fill();
     } else if (e.stunTimer > 0) {
-      ctx.fillStyle = Theme.status.stun; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('☆', e.x, e.y - e.radius - 12 + Math.sin(this.now / 120) * 2);
+      const sy = e.y - e.radius - 12 + Math.sin(this.now / 120) * 2;
+      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 2.5; ctx.strokeStyle = Theme.shadow.outline; ctx.strokeText('☆', e.x, sy);
+      ctx.fillStyle = Theme.status.stun; ctx.fillText('☆', e.x, sy);
     } else if (e.charmTimer > 0) {
-      ctx.fillStyle = Theme.status.charm; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('♥', e.x, e.y - e.radius - 12 + Math.sin(this.now / 150) * 2);
+      const cy2 = e.y - e.radius - 12 + Math.sin(this.now / 150) * 2;
+      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 2.5; ctx.strokeStyle = Theme.shadow.outline; ctx.strokeText('♥', e.x, cy2);
+      ctx.fillStyle = Theme.status.charm; ctx.fillText('♥', e.x, cy2);
     } else if (e.fearTimer > 0) {
+      ctx.save();
+      ctx.shadowColor = Theme.status.fearRing; ctx.shadowBlur = 5;
       ctx.strokeStyle = Theme.status.fearRing; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(e.x, e.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
     }
     if (e.poisonTimer > 0) {
       ctx.fillStyle = Theme.status.poisonAura;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 3, 0, Math.PI * 2); ctx.fill();
+      // a second, smaller bubble alongside the original — one lone dot read
+      // as a stray mark; two at different sizes/offsets reads as bubbling
       ctx.fillStyle = Theme.status.poisonBlob;
       ctx.beginPath(); ctx.arc(e.x + e.radius * 0.6, e.y - e.radius * 0.9, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e.x - e.radius * 0.5, e.y - e.radius * 0.5, 1.8, 0, Math.PI * 2); ctx.fill();
     }
     if (e.vulnerableTimer > 0) {
       const pulse = 0.5 + Math.sin(this.now / 100) * 0.5;
       ctx.strokeStyle = Theme.status.vulnerableRing; ctx.lineWidth = 1.5 + pulse;
       ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 4, 0, Math.PI * 2); ctx.stroke();
       const cs = 4;
+      ctx.save();
+      ctx.shadowColor = Theme.status.vulnerableMark; ctx.shadowBlur = 4;
       ctx.strokeStyle = Theme.status.vulnerableMark; ctx.lineWidth = 2;
       const mx = e.x, my = e.y - e.radius - 12;
       ctx.beginPath();
       ctx.moveTo(mx - cs, my - cs); ctx.lineTo(mx + cs, my + cs);
       ctx.moveTo(mx + cs, my - cs); ctx.lineTo(mx - cs, my + cs);
       ctx.stroke();
+      ctx.restore();
     }
   },
 
   drawBossHealthBar(){
     const boss = this.currentRoom.enemies.find(e => e.isBoss && !e.isDead);
-    if (!boss) return;
+    if (!boss) { this._bossBarBoss = null; return; }
     const ctx = this.ctx;
     const w = CAMERA_W * 0.7, x = (CAMERA_W - w) / 2, y = 10;
+    const frac = Util.clamp(boss.hp / boss.maxHp, 0, 1);
+
+    // Phase 12 visual pass — a lagging "ghost" segment that eases DOWN toward
+    // the real fraction instead of the bar just being shorter next frame, so
+    // a big hit reads as a visible chunk carved out of the bar rather than a
+    // silent snap. Self-contained frame-delta (this.now is a fresh ms
+    // timestamp every render call, see the field's own comment in game.js)
+    // rather than depending on an external dt, since render() doesn't
+    // receive one. Reset whenever the boss reference itself changes — a new
+    // boss room, or a multi-phase fight swapping enemies — so it can never
+    // carry a stale ghost value in from a previous fight.
+    if (this._bossBarBoss !== boss) { this._bossBarBoss = boss; this._bossBarGhost = frac; this._bossBarGhostT = this.now; }
+    const dt = Math.min(0.1, Math.max(0, (this.now - this._bossBarGhostT) / 1000));
+    this._bossBarGhostT = this.now;
+    this._bossBarGhost = frac >= this._bossBarGhost ? frac : Math.max(frac, this._bossBarGhost - dt * 0.35);
+
+    // "bloodied" warning (Phase 12 visual pass, batch 3) — under 25% HP the
+    // whole frame gets a harder, faster-pulsing red glow instead of the
+    // calm default, so a boss on the ropes reads as urgent even out of the
+    // corner of your eye, without needing to actually read the bar.
+    const bloodied = frac < 0.25 && frac > 0;
+    const bloodPulse = bloodied ? 0.5 + Math.sin(this.now / 110) * 0.5 : 0;
+    ctx.save();
+    ctx.shadowColor = bloodied ? '#ff3a4a' : Theme.ui.bossBarFill;
+    ctx.shadowBlur = bloodied ? 10 + bloodPulse * 10 : 8;
     ctx.fillStyle = Theme.ui.bossBarBack; ctx.fillRect(x - 2, y - 2, w + 4, 14);
+    ctx.restore();
+    ctx.strokeStyle = bloodied ? `rgba(255,58,74,${0.4 + bloodPulse * 0.4})` : 'rgba(255,255,255,.18)';
+    ctx.lineWidth = bloodied ? 1.5 : 1;
+    ctx.strokeRect(x - 2.5, y - 2.5, w + 5, 15);
+
     ctx.fillStyle = Theme.ui.bossBarEmpty; ctx.fillRect(x, y, w, 10);
-    ctx.fillStyle = Theme.ui.bossBarFill; ctx.fillRect(x, y, w * Util.clamp(boss.hp / boss.maxHp, 0, 1), 10);
-    ctx.fillStyle = Theme.ui.text; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    // ghost segment — recently-lost HP, dimmer than the live fill, eases out
+    if (this._bossBarGhost > frac) {
+      ctx.fillStyle = 'rgba(227,91,106,.45)';
+      ctx.fillRect(x + w * frac, y, w * (this._bossBarGhost - frac), 10);
+    }
+    // live fill gets a vertical sheen instead of one flat color, matching
+    // the gradient/glow treatment every other HUD/world surface already has
+    const grad = ctx.createLinearGradient(x, y, x, y + 10);
+    grad.addColorStop(0, '#ff8a96');
+    grad.addColorStop(0.45, Theme.ui.bossBarFill);
+    grad.addColorStop(1, '#a83040');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w * frac, 10);
+
+    ctx.fillStyle = Theme.ui.text; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,.9)'; ctx.shadowBlur = 4;
     ctx.fillText(boss.name, CAMERA_W / 2, y + 24);
+    ctx.shadowBlur = 0;
   },
 
   drawProjectiles(){
@@ -1246,10 +1400,18 @@ Object.assign(Game.prototype, {
 
   drawFloatTexts(){
     const ctx = this.ctx;
+    ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+    // Phase 12 visual pass (canvas batch) — a dark keyline behind every
+    // float text (damage numbers, "CRIT", pickup labels), the same
+    // legibility convention as the shop price/every other small-text spot
+    // in this game. Set once outside the loop since it's identical for
+    // every entry — lineWidth/strokeStyle don't need to be per-iteration.
+    ctx.lineWidth = 3; ctx.strokeStyle = Theme.shadow.outline;
     for (const f of this.floatTexts) {
       const alpha = Util.clamp(f.life / f.maxLife, 0, 1);
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = f.color; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = f.color;
       ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }

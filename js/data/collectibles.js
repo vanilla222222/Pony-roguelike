@@ -101,6 +101,44 @@ const STAR_TYPES = {
   sadalsuud: { id:'sadalsuud', name:'Sadalsuud', icon:'🌠', color:'#eaf2ff', locked:true, desc:'Drops 3 more stars on the ground.' },
   zosma: { id:'zosma', name:'Zosma', icon:'👑', color:'#b03a5a', locked:true, desc:'Promotes every enemy to a champion, then marks them all Vulnerable.' },
   alphard: { id:'alphard', name:'Alphard', icon:'🗡️', color:'#c93a5a', locked:true, desc:'+12 damage for the rest of this room, but you drop to 1 red heart.' },
+
+  /* ================= PHASE 8e — skill-tree-unlocked stars ==============
+     25 more locked stars, id-prefixed `sk8s_` (this content slice runs in
+     parallel with three sibling slices minting trinkets/familiars/items —
+     the prefix rules out any id collision between them without either side
+     having to coordinate). Unlike every earlier locked batch (achievement-
+     or superboss-gated), these are unlocked one-for-one by leaf nodes under
+     'unlock_stars_hub' in skilltree-unlocks-stars.js — spending a skill
+     point sets unlocks.unlockedStars[id] directly (see skilltree.js's
+     applySkillTreeUnlockEffect), the exact same bucket isStarUnlocked reads
+     regardless of how it got flipped. Every effect below still reuses a
+     mechanism that already existed in stars.js's applyStarEffect — see the
+     per-case comments there. ==================================== */
+  sk8s_pyrrha:       { id:'sk8s_pyrrha', name:'Pyrrha', icon:'🔥', color:'#e2653a', locked:true, desc:'+4 damage for the rest of this room.' },
+  sk8s_borealis:     { id:'sk8s_borealis', name:'Borealis', icon:'💨', color:'#7fd6c9', locked:true, desc:'+60% speed for the rest of this room.' },
+  sk8s_thessaly:     { id:'sk8s_thessaly', name:'Thessaly', icon:'❤️', color:'#e35b6a', locked:true, desc:'+2 red hearts.' },
+  sk8s_wren:         { id:'sk8s_wren', name:'Wren', icon:'💙', color:'#5b9ee3', locked:true, desc:'+3 blue hearts.' },
+  sk8s_gilded:       { id:'sk8s_gilded', name:'Gilded', icon:'💫', color:'#f0d878', locked:true, desc:'Fully restores your red hearts AND your blue hearts.' },
+  sk8s_cinder:       { id:'sk8s_cinder', name:'Cinder', icon:'☄️', color:'#d0532e', locked:true, desc:'Deal moderate damage to every enemy in the room — scaled to how deep you are.' },
+  sk8s_frostbind:    { id:'sk8s_frostbind', name:'Frostbind', icon:'🧊', color:'#6ad0e0', locked:true, desc:'Freezes every enemy in the room for 6 seconds.' },
+  sk8s_thornveil:    { id:'sk8s_thornveil', name:'Thornveil', icon:'🛡️', color:'#7aa86a', locked:true, desc:'Blocks the next 2 hits you take.' },
+  sk8s_aegis:        { id:'sk8s_aegis', name:'Aegis', icon:'✨', color:'#c0d8f0', locked:true, desc:'Invincible for 15 seconds.' },
+  sk8s_venomkiss:    { id:'sk8s_venomkiss', name:'Venomkiss', icon:'🐍', color:'#6fa83a', locked:true, desc:'Poisons every enemy in the room for 8 seconds.' },
+  sk8s_dreadhowl:    { id:'sk8s_dreadhowl', name:'Dreadhowl', icon:'😱', color:'#6a6ad0', locked:true, desc:'Terrifies every enemy in the room — they flee for 6 seconds.' },
+  sk8s_puppeteer:    { id:'sk8s_puppeteer', name:'Puppeteer', icon:'🎭', color:'#d06ac0', locked:true, desc:'Charms the strongest enemy in the room into fighting for you for 14 seconds.' },
+  sk8s_direstrike:   { id:'sk8s_direstrike', name:'Direstrike', icon:'⚔️', color:'#8a3ae0', locked:true, desc:'Deals damage equal to 75% of the strongest enemy\'s current health.' },
+  sk8s_gale:         { id:'sk8s_gale', name:'Gale', icon:'💥', color:'#e0c05a', locked:true, desc:'Blasts every enemy in the room away from you.' },
+  sk8s_fortune:      { id:'sk8s_fortune', name:'Fortune', icon:'🍀', color:'#5ad08a', locked:true, desc:'+1 Luck for the rest of the run.' },
+  sk8s_farsight:     { id:'sk8s_farsight', name:'Farsight', icon:'🔭', color:'#7fd6e0', locked:true, desc:'+1 tile of attack range for the rest of the run.' },
+  sk8s_battery:      { id:'sk8s_battery', name:'Battery', icon:'🔋', color:'#7ac0d0', locked:true, desc:'Fully recharges your active item.' },
+  sk8s_cartographer: { id:'sk8s_cartographer', name:'Cartographer', icon:'🗺️', color:'#8a9ae0', locked:true, desc:"Reveals this floor's entire map, secret rooms included." },
+  sk8s_demolition:   { id:'sk8s_demolition', name:'Demolition', icon:'💣', color:'#c9522e', locked:true, desc:'Destroys every destructible object in the room.' },
+  sk8s_prospector:   { id:'sk8s_prospector', name:'Prospector', icon:'🪙', color:'#e3c15b', locked:true, desc:'Drops 5 coins on the ground.' },
+  sk8s_medic:        { id:'sk8s_medic', name:'Medic', icon:'💗', color:'#f07a90', locked:true, desc:'Drops 3 hearts on the ground.' },
+  sk8s_quartermaster:{ id:'sk8s_quartermaster', name:'Quartermaster', icon:'🧰', color:'#a0a8b0', locked:true, desc:'Drops 2 keys and 2 bombs on the ground.' },
+  sk8s_alchemist:    { id:'sk8s_alchemist', name:'Alchemist', icon:'💊', color:'#b48ce0', locked:true, desc:'Drops 3 pills on the ground.' },
+  sk8s_pyroclast:    { id:'sk8s_pyroclast', name:'Pyroclast', icon:'🧨', color:'#e0895a', locked:true, desc:'Drops 4 bombs on the ground.' },
+  sk8s_shrine:       { id:'sk8s_shrine', name:'Shrine', icon:'🏛️', color:'#f0b060', locked:true, desc:'Spawns a free item pedestal in this room.' },
 };
 const STAR_LIST = Object.values(STAR_TYPES);
 
@@ -150,6 +188,29 @@ const OBSTACLES = {
   // branch for obstacle-fired bolts (owner 'enemy' + a homing value)
   purplefire:   { id:'purplefire', name:'Purple Fire', desc:'Hazard flame whose bolts curve after you. Attacks do nothing — only a bomb blast puts it out.', hazard:true, attackable:false, destructible:true, dmg:1, heartDropChance:0.10,
                   projectile:true, fireCooldown:20, homing:2, boltColor:'#c98af0', color:'#a34fd6', dark:'#4f2570' },
+  // Phase 15 — three more colors, each with its own NEW form of shooting
+  // (see combat-4.js's updateObstacles, the shared projectile-firing block
+  // every colored fire above already goes through):
+  greenfire:    { id:'greenfire', name:'Green Fire', desc:'Hazard flame that fires a 3-bolt fan instead of a single shot — 3 hits douses it.',
+                  hazard:true, attackable:true, maxHp:3, dmg:1, heartDropChance:0.10,
+                  projectile:true, fireCooldown:10, spreadShots:3, spreadAngle:0.5, boltColor:'#6ad65a', color:'#3a9a3a', dark:'#1c5c1c' },
+  // explosiveBolt — the bolt itself is ordinary (same range-gated aim as
+  // redfire), but detonates a small blast the instant it dies (reuses
+  // combat-3.js's detonateExplosiveProjectile, the exact same plumbing an
+  // Explosive Tear rides — the first time an OBSTACLE has used it rather
+  // than a player/familiar bolt). Not attackable, same "only a bomb puts it
+  // out" shape as blue/purple/black fire below.
+  whitefire:    { id:'whitefire', name:'White Fire', desc:'Hazard flame whose bolt detonates into a small blast when it burns out. Attacks do nothing — only a bomb blast puts it out.',
+                  hazard:true, attackable:false, destructible:true, dmg:1, heartDropChance:0.10,
+                  projectile:true, fireCooldown:14, explosiveBolt:true, boltColor:'#f0ece0', color:'#d8d0b8', dark:'#8a8268' },
+  // spin — never aims at all, just leaks one bolt per tick off a steadily
+  // rotating angle (own ob.spinAngle field, only ever touched here). No
+  // range gate either — unlike redfire it threatens the whole room, not
+  // just close range, which is why its cooldown is much faster than a
+  // targeting/directional turret's but each individual bolt is cheap.
+  blackfire:    { id:'blackfire', name:'Black Fire', desc:'Hazard flame that never aims — it just spins, leaking one bolt per tick around a full circle. Attacks do nothing — only a bomb blast puts it out.',
+                  hazard:true, attackable:false, destructible:true, dmg:1, heartDropChance:0.10,
+                  projectile:true, fireCooldown:0.4, spin:true, boltColor:'#8a3ac9', color:'#3a1c52', dark:'#160a24' },
   // sacrifice rooms only — a fixed, indestructible hazard at room center,
   // deals a full heart on contact (see combat.js's updateObstacles); see
   // combat.js's triggerSacrificeSpike for its per-step reward table
@@ -198,6 +259,144 @@ const OBSTACLES = {
   currents:     { id:'currents', name:'Current — South', desc:'A rushing current — pushes you south while you stand in it.', walkable:true, current:true, pushX:0, pushY:1, color:'#4fa8d6', dark:'#25597a' },
   currente:     { id:'currente', name:'Current — East', desc:'A rushing current — pushes you east while you stand in it.', walkable:true, current:true, pushX:1, pushY:0, color:'#4fa8d6', dark:'#25597a' },
   currentw:     { id:'currentw', name:'Current — West', desc:'A rushing current — pushes you west while you stand in it.', walkable:true, current:true, pushX:-1, pushY:0, color:'#4fa8d6', dark:'#25597a' },
+
+  // ---- Phase 10 PLACEHOLDER — proves the obstacle pipeline can host a new
+  // directional-capable kind for the 'floorfeature' rooms (dungeon.js) without
+  // any of the per-stage mechanics existing yet. Deliberately inert: walkable,
+  // no `current`/`projectile`/`hazard`/`destructible` flag, so every system
+  // that dispatches on those (combat-1.js's updatePlayer push, updateObstacles,
+  // damageObstacleHit) skips it entirely and it renders as a plain floor
+  // decal. `pushX/pushY` are carried at 0 purely to document the shape the
+  // real stage objects will fill in. Not referenced by any room template — the
+  // one floorfeature template is empty — so it cannot appear in game yet. ----
+  floorswitch:  { id:'floorswitch', name:'???', desc:'Placeholder — the stage-specific special objects land in a future content phase.', walkable:true, pushX:0, pushY:0, color:'#6a6a7a', dark:'#3a3a46' },
+
+  /* ---- Phase 10 CONTENT GROUP 1 — the per-stage floorfeature objects for
+     the Frozen Desert / Badlands / Beach (floorNum 15-20). All additive:
+     every one is built out of a mechanism that already exists, so no
+     engine file had to change to support them.
+
+     - ICE SLIDE (x4 facings) reuses the `current` push exactly as the
+       C-branch current tiles do (combat-1.js's updatePlayer adds
+       pushX/pushY * CURRENT_PUSH_SPEED while the player overlaps one).
+       This is the "up to four directional variants" allowance the
+       coordination doc grants, spent on ONE object that genuinely needs
+       four facings. Push magnitude is 1.25 rather than 1 — pushX/pushY
+       are multipliers, not flags — so a slide reads as noticeably
+       stronger than a sewer current.
+     - QUICKSAND / TIDE POOL reuse the Sand Trap's `freeze` mechanism
+       (combat-4.js's updateObstacles, `isFreezeTrap`): walkable, zero
+       damage, just a brief loss of control. Quicksand holds longer than
+       a Sand Trap; a tide pool is a shorter, nastier tap.
+     - DUST VENT reuses the fixed-angle turret pipeline (`projectile` +
+       `angles`, combat-4.js) but is walkable, so unlike a real turret it
+       never blocks the room — you walk through the grit and eat it.
+     - TIDE SURGE (x2 facings) is a stronger, horizontal-only current
+       used to build rip channels; two facings, not four, because a
+       channel only ever needs east/west.
+
+     None of these are floor-gated in dungeon.js's obstacleAllowedOnFloor
+     (which defaults to `true`), so their ONLY gate is the `f:[...]` floor
+     filter on the templates that place them — see
+     roomTemplates/stage4-6-floorfeature.js, the sole consumer. ---- */
+  iceslidan:    { id:'iceslidan', name:'Ice Slide — North', desc:'Polished glacier glass. Skates you north for as long as you are standing on it.', walkable:true, current:true, pushX:0, pushY:-1.25, color:'#bfe4f7', dark:'#4a7a92' },
+  iceslidas:    { id:'iceslidas', name:'Ice Slide — South', desc:'Polished glacier glass. Skates you south for as long as you are standing on it.', walkable:true, current:true, pushX:0, pushY:1.25, color:'#bfe4f7', dark:'#4a7a92' },
+  iceslidae:    { id:'iceslidae', name:'Ice Slide — East', desc:'Polished glacier glass. Skates you east for as long as you are standing on it.', walkable:true, current:true, pushX:1.25, pushY:0, color:'#bfe4f7', dark:'#4a7a92' },
+  iceslidaw:    { id:'iceslidaw', name:'Ice Slide — West', desc:'Polished glacier glass. Skates you west for as long as you are standing on it.', walkable:true, current:true, pushX:-1.25, pushY:0, color:'#bfe4f7', dark:'#4a7a92' },
+  quicksand:    { id:'quicksand', name:'Quicksand', desc:'Badlands sink-sand — grabs and holds you for a moment. No damage, but you are not going anywhere while it has you.', freeze:true, freezeDuration:0.85, walkable:true, color:'#c2a663', dark:'#6e5a2c' },
+  dustvent:     { id:'dustvent', name:'Dust Vent', desc:'A canyon fissure venting grit on all four diagonals. Walk straight through it if you like — the grit still lands.', projectile:true, fireCooldown:1.8, dmg:1, angles:[Math.PI / 4, 3 * Math.PI / 4, -3 * Math.PI / 4, -Math.PI / 4], boltColor:'#e0c089', walkable:true, color:'#b09060', dark:'#5e4a28' },
+  tidesurgee:   { id:'tidesurgee', name:'Tide Surge — East', desc:'A rip channel running east. Far stronger than a sewer current — crossing it costs you ground.', walkable:true, current:true, pushX:1.6, pushY:0, color:'#4fc8e0', dark:'#1e6c80' },
+  tidesurgew:   { id:'tidesurgew', name:'Tide Surge — West', desc:'A rip channel running west. Far stronger than a sewer current — crossing it costs you ground.', walkable:true, current:true, pushX:-1.6, pushY:0, color:'#4fc8e0', dark:'#1e6c80' },
+  tidepool:     { id:'tidepool', name:'Tide Pool', desc:'Ankle-deep undertow. Grabs briefly on contact — shorter than quicksand, and always somewhere you needed to keep moving.', freeze:true, freezeDuration:0.45, walkable:true, color:'#6fd0e0', dark:'#2c6470' },
+
+  /* ---- Phase 10 CONTENT GROUP 2 — the per-stage floorfeature objects for
+     the Ocean / The Sea Floor / Trench (floorNum 21-26). Same rule Group 1
+     followed: every one is built out of a mechanism that already exists,
+     so no engine file changed to support them.
+
+     - RIPTIDE (x4 facings) is the `current` push again (combat-1.js's
+       updatePlayer, pushX/pushY * CURRENT_PUSH_SPEED while the player
+       overlaps). This is the coordination doc's "up to four directional
+       variants" allowance, spent on ONE object that needs four facings —
+       the Ocean's identity is a rotating body of water, which cannot be
+       built from two. Push is 1.9, the strongest in the game: stronger
+       than a Beach tide surge (1.6), which is stronger than an ice slide
+       (1.25), which is stronger than a sewer current (1.0). That ordering
+       is deliberate and matches the stage ordering.
+       These CANNOT reuse the existing currentn/s/e/w kinds: dungeon.js's
+       obstacleAllowedOnFloor hard-gates those four to floorPath 'C', and
+       dungeon.js is outside this group's file ownership. New kinds fall
+       through to that function's default `true` instead.
+     - GLOW BLOOM is the Sea Floor's bioluminescent hazard, on the
+       thornbush mechanism (`hazard` + `attackable:false` +
+       `destructible`): non-solid, so you can walk through it and simply
+       take the hit, and immune to attacks — only a bomb blast clears a
+       patch. Lights the silt and denies the ground under it.
+     - PRESSURE COLUMN is the Trench's crushing-pressure object, on the
+       spikedrock mechanism (`hazard` + `solid` + `destructible`): it
+       blocks like a rock AND hurts on contact, which is what turns a
+       Trench feature room into a genuine corridor — every wall of the
+       maze is also a damage source, so brushing one while dodging costs
+       you.
+
+     None are floor-gated in obstacleAllowedOnFloor, so their only gate is
+     the `f:[...]` filter on the templates that place them — see
+     roomTemplates/stage7-9-floorfeature.js, their sole consumer. ---- */
+  riptiden:      { id:'riptiden', name:'Riptide — North', desc:'Open-ocean riptide running north. The strongest water in the game — you do not cross this one, you go with it.', walkable:true, current:true, pushX:0, pushY:-1.9, color:'#3d9ad6', dark:'#154a70' },
+  riptides:      { id:'riptides', name:'Riptide — South', desc:'Open-ocean riptide running south. The strongest water in the game — you do not cross this one, you go with it.', walkable:true, current:true, pushX:0, pushY:1.9, color:'#3d9ad6', dark:'#154a70' },
+  riptidee:      { id:'riptidee', name:'Riptide — East', desc:'Open-ocean riptide running east. The strongest water in the game — you do not cross this one, you go with it.', walkable:true, current:true, pushX:1.9, pushY:0, color:'#3d9ad6', dark:'#154a70' },
+  riptidew:      { id:'riptidew', name:'Riptide — West', desc:'Open-ocean riptide running west. The strongest water in the game — you do not cross this one, you go with it.', walkable:true, current:true, pushX:-1.9, pushY:0, color:'#3d9ad6', dark:'#154a70' },
+  glowbloom:     { id:'glowbloom', name:'Glow Bloom', desc:'A bed of bioluminescent polyps. Walk through it and it burns — attacks do nothing to it, only a bomb blast clears a patch.', hazard:true, attackable:false, destructible:true, dmg:2, heartDropChance:0.08, color:'#7ae0c0', dark:'#1e5a48' },
+  pressurecolumn:{ id:'pressurecolumn', name:'Pressure Column', desc:'A standing column of compressed trench water. Solid as rock and it crushes on contact — every wall down here is also a wound. Bombable.', hazard:true, solid:true, destructible:true, dmg:2, color:'#2a4a62', dark:'#101f2c' },
+
+  /* ---- Phase 10 CONTENT GROUP 3 — the per-stage floorfeature objects for
+     the Trench Depths / Deep Dark / Meta Realm / Hyperspace (floorNum
+     27-34), the four deepest stages in the game. Same rule Groups 1 and 2
+     followed: every one is assembled out of a mechanism that already
+     exists, so no engine file changed to support them.
+
+     - CRUSH VENT (Trench Depths) is the fixed-angle turret pipeline
+       (`projectile` + `angles`, combat-4.js's updateObstacles) taken to
+       eight directions at once, on a solid indestructible body. It is the
+       escalation of Group 2's Pressure Column: that one hurt you for
+       touching it, this one does not need you to touch it at all. The
+       chimney silhouette comes free — with no `current`/hazard/kind-
+       specific art branch it falls to Util.drawObstacle's rock body,
+       which is exactly what a black smoker looks like.
+     - LURE HORN (Deep Dark) is the targeting turret plus purplefire's
+       `homing`, on a very long cooldown: one slow bolt that curves after
+       you, from something in the dark you cannot see coming. Solid and
+       indestructible, so it is also cover — cover that is hunting you.
+     - PHANTOM WALL (Meta Realm) is the reality break, and it is pure
+       data: `walkable:true` on a body that carries tallhardrock's exact
+       colours and `tall` flag, so it renders as a wall (there is no
+       kind-specific art branch, and the rock branch keys off `ob.tall`)
+       and behaves as open floor for movement, pathing, line of sight and
+       projectiles. The room lies about its own geometry; some of the
+       maze is not there. Note it is walkable for ENEMIES too (ai-1.js's
+       makeIsBlockedFn skips `isWalkable`), which is the point.
+     - WARP STREAM (x4 facings) is the `current` push at 2.4, the
+       strongest in the game and deliberately the top of the established
+       ordering: sewer current 1.0 < ice slide 1.25 < tide surge 1.6 <
+       riptide 1.9 < warp stream 2.4. This is the coordination doc's "up
+       to four directional variants" allowance, spent on the one object
+       that needs four facings — a fold in space has to be able to run in
+       any direction or Hyperspace's feature rooms cannot be built.
+       It cannot reuse currentn/s/e/w for the reason Group 2 gives above:
+       dungeon.js's obstacleAllowedOnFloor hard-gates those four to
+       floorPath 'C'.
+
+     None of these are floor-gated in obstacleAllowedOnFloor (which
+     defaults to `true`), so their ONLY gate is the `f:[...]` floor filter
+     on the templates that place them — see
+     roomTemplates/stage10-13-floorfeature.js, their sole consumer. ---- */
+  crushvent:    { id:'crushvent', name:'Crush Vent', desc:'A black smoker venting on all eight bearings. It does not need you to touch it — standing anywhere near it is the mistake.', projectile:true, fireCooldown:2.2, dmg:2, angles:[0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, -3 * Math.PI / 4, -Math.PI / 2, -Math.PI / 4], boltColor:'#3f7fc0', destructible:false, color:'#1c3c5c', dark:'#0a1826' },
+  lurehorn:     { id:'lurehorn', name:'Lure Horn', desc:'Something in the dark is aiming this. One slow bolt every few seconds, and it curves after you the whole way.', projectile:true, fireCooldown:4.5, dmg:2, targeting:true, homing:2.2, boltColor:'#8aa0b8', destructible:false, color:'#1a1c24', dark:'#0a0b0f' },
+  phantomwall:  { id:'phantomwall', name:'Phantom Wall', desc:'Indistinguishable from solid rock, and not there. Walk through it — everything else in the room can too.', walkable:true, tall:true, color:'#3d392f', dark:'#232019' },
+  warpstreamn:  { id:'warpstreamn', name:'Warp Stream — North', desc:'A fold in space running north. Nothing in the game pulls harder — you do not walk across this, you arrive on the far side of it.', walkable:true, current:true, pushX:0, pushY:-2.4, color:'#ff4fd8', dark:'#6a1c5a' },
+  warpstreams:  { id:'warpstreams', name:'Warp Stream — South', desc:'A fold in space running south. Nothing in the game pulls harder — you do not walk across this, you arrive on the far side of it.', walkable:true, current:true, pushX:0, pushY:2.4, color:'#ff4fd8', dark:'#6a1c5a' },
+  warpstreame:  { id:'warpstreame', name:'Warp Stream — East', desc:'A fold in space running east. Nothing in the game pulls harder — you do not walk across this, you arrive on the far side of it.', walkable:true, current:true, pushX:2.4, pushY:0, color:'#ff4fd8', dark:'#6a1c5a' },
+  warpstreamw:  { id:'warpstreamw', name:'Warp Stream — West', desc:'A fold in space running west. Nothing in the game pulls harder — you do not walk across this, you arrive on the far side of it.', walkable:true, current:true, pushX:-2.4, pushY:0, color:'#ff4fd8', dark:'#6a1c5a' },
 
   // ---- TURRETS — solid (non-hazard, so they block movement like a rock),
   // bomb-destructible but NOT attackable (melee/ranged bounce off — a bomb

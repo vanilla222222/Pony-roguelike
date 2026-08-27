@@ -52,6 +52,10 @@ class Game {
 
   startRun(classId){
     this.player = new Player(classId);
+    // Phase 8b — skill tree starting-pickup nodes (bombs/keys/coins/blue
+    // hearts); see achievements/skilltree.js. Order vs. recalcPlayerStats
+    // doesn't matter — it only touches pickup counters, not derived stats.
+    applySkillTreeStartingPickups(this.player);
     recalcPlayerStats(this.player);
     this.state = 'playing';
     this.paused = false;
@@ -92,6 +96,15 @@ class Game {
     } else if (this.floorPath === 'D') {
       // mirrors the C line above — same three-region split as dPaletteFor
       markBestiarySeen('seenStages', floorNum <= 4 ? 'observatory' : floorNum <= 6 ? 'orrery' : 'voidbetween', this);
+    } else if (floorNum > OLD_MAIN_ROUTE_FINAL_FLOOR) {
+      // Phase 10 — the extended main route (floorNum 15-34) drops back to the
+      // plain STAGES/stageIndexForFloor chain, exactly like floors 0-7 do in
+      // the final else below: no A/B branch suffix (floorBranch is still
+      // sticky from floor 9's fork but means nothing out here) and no
+      // numbered-floor id. Checked FIRST so neither the floorNum>=12
+      // ('13'/'14'/'15') case nor the floorBranch case can claim these floors
+      // and mint ids like '16' or '16a' that no STAGE_LIST page has.
+      markBestiarySeen('seenStages', STAGES[stageIndexForFloor(floorNum)].id, this);
     } else if (floorNum >= 12) {
       // floors 13/14/15 — all linear, one bestiary id each (stages.js STAGE_LIST)
       markBestiarySeen('seenStages', String(floorNum + 1), this);
@@ -100,6 +113,43 @@ class Game {
     } else {
       markBestiarySeen('seenStages', STAGES[stageIndexForFloor(floorNum)].id, this);
     }
+    // Stage background music. Plain-route floors look up STAGE_MUSIC_TRACKS
+    // (stages.js) by the current stage id via the same stageIndexForFloor
+    // chain used just above for the bestiary — covers the whole route now,
+    // not just floorNum<=OLD_MAIN_ROUTE_FINAL_FLOOR: the Phase 10 stages
+    // (frozendesert..hyperspace) have their own MUSIC_TRACKS entries too,
+    // and this used to stop short of them, leaving those tracks wired but
+    // unreachable in an actual run. C-branch floors look up C_MUSIC_TRACKS
+    // via cMusicTrackFor(floorNum) (gutters/sewers/rainforest/mangroves),
+    // D-branch floors look up D_MUSIC_TRACKS via dMusicTrackFor(floorNum)
+    // (observatory/orrery/voidbetween) — both the audio equivalents of
+    // their respective cPaletteFor/dPaletteFor region splits. Any
+    // stage/region with no entry in its table just falls through to
+    // stopMusic(). startMusic/stopMusic are both idempotent (see their own
+    // doc comments in audio.js), so this can run unconditionally on every
+    // startFloor — two floors of the same stage/region never restart the
+    // loop, and leaving for any other stage/branch/region fades it out
+    // exactly once.
+    // Resolved once here and stashed on `this.currentFloorTrackId` rather
+    // than called unconditionally like it used to be — enterRoom (below)
+    // now overrides the floor's track with a room-type one (boss/crystal/
+    // etc, see ROOM_MUSIC_TRACKS) for as long as the player is standing in
+    // a room that has one, and needs to know what to restore when they
+    // leave it. startFloor itself still starts the floor's track (every
+    // start-of-floor entry is into the start room, which has no
+    // ROOM_MUSIC_TRACKS entry, so enterRoom's own logic would resolve to
+    // the exact same track anyway — setting it here just avoids a
+    // redundant double-lookup on floor 0).
+    if (!this.floorPath) {
+      this.currentFloorTrackId = STAGE_MUSIC_TRACKS[STAGES[stageIndexForFloor(floorNum)].id] || null;
+    } else if (this.floorPath === 'C') {
+      this.currentFloorTrackId = cMusicTrackFor(floorNum);
+    } else if (this.floorPath === 'D') {
+      this.currentFloorTrackId = dMusicTrackFor(floorNum);
+    } else {
+      this.currentFloorTrackId = null;
+    }
+    if (this.currentFloorTrackId) Sound.startMusic(this.currentFloorTrackId); else Sound.stopMusic();
     // Night Owl's Feather / Spectral Token — mark rooms "seen" (shape known,
     // type still hidden until visited/revealed) rather than "discovered",
     // same distinction the minimap already draws on — see ui.js drawMinimap
@@ -136,7 +186,7 @@ class Game {
     // line. Floor 1 itself isn't worth celebrating (every fresh save "beats"
     // it the first time it loads), so the toast only fires past that.
     if (setStatMax('deepestFloor', floorNum + 1) && floorNum > 0) {
-      this.toast('🏅 New personal best! Reached Floor ' + (floorNum + 1) + ' for the first time.');
+      this.toast('🏅 New personal best! Reached Floor ' + (floorNum + 1) + ' for the first time.', false, 'good');
     }
     // floorNum-sensitive, so it has to exclude BOTH alternate paths — floorNum
     // 8 is 9C on the C-branch and 9D on the D-branch, not floor 9 of the
@@ -217,6 +267,20 @@ class Game {
         unlockAchievement('exploration_reach_8d', this);
         if (this.runElapsed < 29 * 60) unlockAchievement('challenge_voidbetween_8d_speedrun', this);
       }
+      // Phase 7h (cont.) — The Void Between, PART 2 (floorKeys '9D'/'10D')
+      // reach + speedrun-to-floor checkpoints. Exact same shape as the
+      // floorNum===5/6/7 checks above (see achievements/defs-12.js's
+      // Exploration/Challenge sections). '10D' DOES have a superboss
+      // (singularity, the D-branch finale) — see onBossDefeated() below for
+      // its boss-room-anchored Challenge block.
+      if (floorNum === 8) {
+        unlockAchievement('exploration_reach_9d', this);
+        if (this.runElapsed < 32 * 60) unlockAchievement('challenge_voidbetween2_9d_speedrun', this);
+      }
+      if (floorNum === 9) {
+        unlockAchievement('exploration_reach_10d', this);
+        if (this.runElapsed < 35 * 60) unlockAchievement('challenge_voidbetween2_10d_speedrun', this);
+      }
       if (floorNum === 4) this.pendingBossType = SUPERBOSSES.astrolabe;        // 5D
       else if (floorNum === 6) this.pendingBossType = SUPERBOSSES.orrery;      // 7D
       else if (floorNum === 9) this.pendingBossType = SUPERBOSSES.singularity; // 10D — the D-branch finale
@@ -237,6 +301,20 @@ class Game {
     else if (floorNum === 12) this.pendingBossType = SUPERBOSSES.wobbler;
     else if (floorNum === 13) this.pendingBossType = SUPERBOSSES.subdrop;
     else if (floorNum === 14) this.pendingBossType = SUPERBOSSES.onetruednb;
+    // Phase 10 — the 10 new post-14 stages, each a 2-floor block; the
+    // superboss lands on the second floor of its stage (see stages.js's
+    // STAGES[4..13] / stage4-6-superbosses.js / stage7-9-superbosses.js /
+    // stage10-13-superbosses.js for the stage/name mapping).
+    else if (floorNum === 16) this.pendingBossType = SUPERBOSSES.iceagent;      // Frozen Desert
+    else if (floorNum === 18) this.pendingBossType = SUPERBOSSES.mexico;        // Badlands
+    else if (floorNum === 20) this.pendingBossType = SUPERBOSSES.g5;            // Beach
+    else if (floorNum === 22) this.pendingBossType = SUPERBOSSES.japan;         // Ocean
+    else if (floorNum === 24) this.pendingBossType = SUPERBOSSES.deannb;        // The Sea Floor
+    else if (floorNum === 26) this.pendingBossType = SUPERBOSSES.israelprimeprime; // Trench
+    else if (floorNum === 28) this.pendingBossType = SUPERBOSSES.palestine;     // Trench Depths
+    else if (floorNum === 30) this.pendingBossType = SUPERBOSSES.warden;        // Deep Dark
+    else if (floorNum === 32) this.pendingBossType = SUPERBOSSES.notch;         // Meta Realm
+    else if (floorNum === 34) this.pendingBossType = SUPERBOSSES.kirkinator;    // Hyperspace — main-route finale
     else this.pendingBossType = resolveGenericBoss(floorNum, this.floorBranch);
     this.enterRoom(this.dungeon.start, null);
   }
@@ -344,8 +422,21 @@ class Game {
       Sound.play('bossIntro');
       this.player.tookDamageThisBossRoom = false; // see the Untouchable achievement
     }
+    // Room-type background music (economy.js's ROOM_MUSIC_TRACKS — boss/
+    // crystal+shrine/sombra+curse/treasure/secret+sacrifice/shop+petshop)
+    // overrides the floor's own track for as long as the player is
+    // standing in a room that has one; every other room type (normal,
+    // start, vault, challenge, star, the two gate rooms, arcade — none of
+    // which have a track of their own) falls through to restoring
+    // whatever this.currentFloorTrackId was set to in startFloor. Both
+    // startMusic/stopMusic are idempotent, so walking back and forth
+    // between two rooms of the same type/floor never restarts either loop.
+    const roomTrackId = ROOM_MUSIC_TRACKS[node.type];
+    if (roomTrackId) Sound.startMusic(roomTrackId);
+    else if (this.currentFloorTrackId) Sound.startMusic(this.currentFloorTrackId);
+    else Sound.stopMusic();
     const label = roomLabel(node);
-    if (label) showRoomBanner(label);
+    if (label) showRoomBanner(label, node.type);
   }
 
   transitionThroughDoor(slot){
@@ -465,7 +556,7 @@ class Game {
     tryArcadeInteract(this);
   }
 
-  toast(msg){ toast(msg); }
+  toast(msg, long, kind){ toast(msg, long, kind); }
 
   onRoomJustCleared(){
     Sound.play('roomClear');
@@ -532,6 +623,20 @@ class Game {
         plapper:0, clapper:0, nhm:0, vanilladnb:0, onetruednb:0 };
       const beforeCount = unlocks.superbossDefeats[superbossId] || 0;
       unlocks.superbossDefeats[superbossId] = beforeCount + 1;
+
+      // Per-CLASS defeat tracking (Phase 10) — the class-select screen shows
+      // each character which superbosses THEY specifically have beaten,
+      // split by route (see ui.js's buildClassSelect + the new
+      // data/enemies/superboss-routes.js). Lazily created the same way the
+      // global counter above is, so an old save with no entries yet just
+      // starts empty rather than needing a migration.
+      if (!unlocks.classSuperbossDefeats) unlocks.classSuperbossDefeats = {};
+      const classId = this.player.classId;
+      if (classId) {
+        if (!unlocks.classSuperbossDefeats[classId]) unlocks.classSuperbossDefeats[classId] = {};
+        const classBeforeCount = unlocks.classSuperbossDefeats[classId][superbossId] || 0;
+        unlocks.classSuperbossDefeats[classId][superbossId] = classBeforeCount + 1;
+      }
 
       if (superbossId === 'polish' && !unlocks.polishDefeated) {
         unlocks.polishDefeated = true;
@@ -643,6 +748,20 @@ class Game {
         if (this.runElapsed < 28 * 60) unlockAchievement('challenge_orrery_speedkill', this);
         if (!this.player.visitedShopThisRun) unlockAchievement('challenge_orrery_frugal', this);
         if (!this.player.tookDamageThisRun) unlockAchievement('challenge_orrery_untouched_run', this);
+      }
+      // Phase 7h (cont.) — The Void Between, PART 2 (The Singularity, 10D)
+      // Challenge achievements. Every condition here reuses an existing
+      // per-player/per-run flag (tookDamageThisBossRoom/tookDamageThisFloor/
+      // tookDamageThisRun/redMax/visitedShopThisRun) or game.runElapsed — no
+      // new stat. See achievements/defs-12.js's Challenge section for the
+      // full id -> reward list.
+      if (superbossId === 'singularity') {
+        if (!this.player.tookDamageThisBossRoom) unlockAchievement('challenge_voidbetween2_flawless', this);
+        if (!this.player.tookDamageThisFloor) unlockAchievement('challenge_voidbetween2_floor_nodamage', this);
+        if (this.player.redMax <= 1) unlockAchievement('challenge_voidbetween2_onehearted', this);
+        if (this.runElapsed < 38 * 60) unlockAchievement('challenge_voidbetween2_speedkill', this);
+        if (!this.player.visitedShopThisRun) unlockAchievement('challenge_voidbetween2_frugal', this);
+        if (!this.player.tookDamageThisRun) unlockAchievement('challenge_voidbetween2_untouched_run', this);
       }
     }
   }
@@ -805,6 +924,11 @@ class Game {
         // live run to toast against. See achievements.js's cbranch_complete /
         // challenge_cbranchwins ladder.
         bumpStat('cBranchRunsCompleted', 1, this);
+        // Phase 10 — clearing the C route is what earns the D route's gate
+        // room (floor 3's planetarium, see dungeon.js). Granted before
+        // endRunUnlocks() for the same reason the bump above is: the toast
+        // needs a live run. It applies from the NEXT run, per unlockPath.
+        unlockPath('D', this);
         this.state = 'win'; endRunUnlocks(); return;
       }
       this.startFloor(this.dungeon.floorNum + 1);
@@ -833,8 +957,10 @@ class Game {
     // maxFloorsThisRun, which is only ever 6 or 8. Floors 13 and 14 (floorNum
     // 12/13, Phase 7a) need their own lines for exactly that reason: without
     // them the fallthrough below would see next=13 >= maxFloorsThisRun and win
-    // the run two floors early. Floor 15 (floorNum 14) deliberately has NO line
-    // and falls through to the win check, so the run ends there. See
+    // the run two floors early. Floor 15 (floorNum 14) used to have NO line and
+    // fall through to the win check; as of Phase 10 the range block just below
+    // carries it (and floors 16-34) onward, and only floorNum
+    // MAIN_ROUTE_FINAL_FLOOR (34) reaches the win check. See
     // isLastFloorOfRun(), which mirrors this same rule for the stairs' "DOWN"
     // vs "ESCAPE" label (render.js's drawStairs)
     if (this.dungeon.floorNum === 8) { this.startFloor(9); return; }
@@ -843,8 +969,38 @@ class Game {
     if (this.dungeon.floorNum === 11) { this.startFloor(12); return; }
     if (this.dungeon.floorNum === 12) { this.startFloor(13); return; }
     if (this.dungeon.floorNum === 13) { this.startFloor(14); return; }
+    // Phase 10 — THE EXTENDED MAIN ROUTE. floorNum 14 ("The One True Descent",
+    // HUD floor 15) used to fall through to the win check below and end the
+    // run; it now continues into floorNum 15 (stage 4, Frozen Desert) and on
+    // through floorNum MAIN_ROUTE_FINAL_FLOOR (34, Hyperspace), which is the
+    // new — and only — Main path ending. Same shape as the hardcoded 8..13
+    // lines above, just expressed as a range because there are twenty of them.
+    //
+    // The unlockPath('C') grant has NOT moved trigger: it still fires on
+    // taking the stairs of floorNum OLD_MAIN_ROUTE_FINAL_FLOOR on the Main
+    // path, exactly as before — that boundary simply isn't the run's end any
+    // more, so the grant lives here instead of in the win branch. unlockPath
+    // is idempotent (it returns early if the path is already earned), and the
+    // win branch below still carries its own identical guard, so a player who
+    // somehow reaches the finale without having crossed 14 still gets it.
+    if (this.dungeon.floorNum >= OLD_MAIN_ROUTE_FINAL_FLOOR && this.dungeon.floorNum < MAIN_ROUTE_FINAL_FLOOR) {
+      if (this.dungeon.floorNum === OLD_MAIN_ROUTE_FINAL_FLOOR) unlockPath('C', this);
+      this.startFloor(this.dungeon.floorNum + 1);
+      return;
+    }
     const next = this.dungeon.floorNum + 1;
-    if (next >= this.maxFloorsThisRun) { this.state = 'win'; endRunUnlocks(); return; }
+    if (next >= this.maxFloorsThisRun) {
+      // Phase 10 — clearing the FULL main route (i.e. taking the stairs on
+      // floorNum OLD_MAIN_ROUTE_FINAL_FLOOR, the old finale) is what earns the
+      // C route's gate room on floor 2 (see dungeon.js). The floorNum test
+      // matters: this same win branch also fires on the short 6/8-floor runs a
+      // player takes before Polish is beaten, and those must NOT unlock
+      // anything. floorPath is necessarily null here — both branch blocks
+      // above return before reaching this line — but the guard is written
+      // explicitly rather than relying on that.
+      if (!this.floorPath && this.dungeon.floorNum >= OLD_MAIN_ROUTE_FINAL_FLOOR) unlockPath('C', this);
+      this.state = 'win'; endRunUnlocks(); return;
+    }
     this.startFloor(next);
   }
 
@@ -862,6 +1018,13 @@ class Game {
     // floorNum 12/13 (floors 13/14) join this list for Phase 7a — descend()
     // hardcodes a next floor for both, so neither is ever the last one.
     if (f === 8 || f === 9 || f === 10 || f === 11 || f === 12 || f === 13) return false;
+    // Phase 10 — floorNum 14-33 are carried by descend()'s extended-main-route
+    // range block, so none of them is the last floor either; floorNum 34
+    // (MAIN_ROUTE_FINAL_FLOOR) is, and it is the ONLY Main path floor that
+    // still ends the run. Kept in lockstep with descend(), as the note above
+    // requires. Floors 0-13 fall through to the unchanged maxFloorsThisRun
+    // rule, so short 6/8-floor runs still label their stairs exactly as before.
+    if (f >= OLD_MAIN_ROUTE_FINAL_FLOOR) return f >= MAIN_ROUTE_FINAL_FLOOR;
     return f + 1 >= this.maxFloorsThisRun;
   }
 

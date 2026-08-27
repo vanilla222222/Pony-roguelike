@@ -245,6 +245,7 @@ function toggleDoorSlot(slot){
 
 const OBSTACLE_GLYPHS = {
   rock:'R', hardrock:'H', pit:'P', tallrock:'r', tallhardrock:'h', cactus:'C', yellowfire:'Y', redfire:'F', bluefire:'f', purplefire:'p', spike:'S',
+  greenfire:'G', whitefire:'W', blackfire:'K', // Phase 15 — 'K' not 'B': bombbarrel already owns 'B'
   spiketrap:'s', spikedrock:'k', tintedrock:'t', movingspike:'M', sandtrap:'D', mud:'U', thornbush:'b', luckcrystal:'l',
   turretn:'^', turrete:'>', turrets:'v', turretw:'<', turretplus:'+', turretx:'X', turrettarget:'@',
   bombbarrel:'B', pushablebombbarrel:'b',
@@ -617,6 +618,7 @@ function populateSpecificSelect(){
     opts.push({ value:'eternalheart', label:'Eternal Heart (survive a floor → container)' });
     opts.push({ value:'sack', label:'Sack (3 random pickups)' });
     opts.push({ value:'battery', label:'Battery (full active charge)' });
+    opts.push({ value:'trashbag', label:'Trash Bag (a friendly fly familiar)' });
     opts.push({ value:'minibattery', label:'Mini Battery (+2 charge)' });
     opts.push({ value:'pill', label:'Pill (unknown effect)' });
     opts.push({ value:'star', label:'Star (random named effect)' });
@@ -650,6 +652,9 @@ function populateSpecificSelect(){
     opts.push({ value:'redfire', label:'Red Fire (3 hits to douse, spits fireballs)' });
     opts.push({ value:'bluefire', label:'Blue Fire (spits bolts, attack-proof — only a bomb douses it)' });
     opts.push({ value:'purplefire', label:'Purple Fire (bolts home in on you, attack-proof — only a bomb douses it)' });
+    opts.push({ value:'greenfire', label:'Green Fire (3 hits to douse, fires a 3-bolt fan)' });
+    opts.push({ value:'whitefire', label:'White Fire (bolts explode on burnout, attack-proof — only a bomb douses it)' });
+    opts.push({ value:'blackfire', label:'Black Fire (never aims, spins a bolt around a full circle, attack-proof — only a bomb douses it)' });
     opts.push({ value:'spike', label:'Sacrifice Spike (full heart, reward trigger — sacrifice rooms)' });
     opts.push({ value:'spiketrap', label:'Spike Trap (hazard, no reward)' });
     opts.push({ value:'spikedrock', label:'Spiked Rock (hazard AND solid, bombable)' });

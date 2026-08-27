@@ -54,11 +54,12 @@ window.addEventListener('keydown', (e) => {
     case 'KeyM': toggleMuteUI(); break;
     case 'KeyT': toggleOverlay('achievementsScreen', buildAchievementsPanel, markAchievementsSeen); break;
     case 'KeyC': toggleOverlay('bestiaryScreen', buildBestiaryPanel, markBestiarySeenBadge); break;
+    case 'KeyK': toggleOverlay('skillTreeScreen', () => { resetSkillTreeCamera(); buildSkillTreePanel(); }); break;
     case 'Escape': {
       // closing an open overlay takes priority over the pause toggle — lets
       // Escape act as a universal "back out of whatever's open" key instead
       // of only ever doing one specific thing
-      const openScreen = ['achievementsScreen', 'bestiaryScreen']
+      const openScreen = ['achievementsScreen', 'bestiaryScreen', 'skillTreeScreen']
         .map(id => document.getElementById(id))
         .find(el => el && !el.classList.contains('hidden'));
       if (openScreen) { Sound.play('uiClick'); openScreen.classList.add('hidden'); }
@@ -99,6 +100,103 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 window.addEventListener('pointerup', (e) => { if (e.button === 0) input.attack = false; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------------------------------------------------------------------------
+// Touch controls (Phase 12 mobile pass) — a virtual joystick (movement) +
+// two on-screen button rows (actions/utilities), all `.touch-only` in
+// style.css so they only ever render on a coarse-pointer/no-hover device;
+// this wiring itself is harmless to leave bound unconditionally (nothing
+// fires unless the hidden elements are actually touched, which can't happen
+// on a mouse+keyboard device where they're display:none). Aiming/attacking
+// deliberately reuses the EXISTING canvas pointerdown/pointermove handlers
+// above rather than adding a second aim scheme — any touch that lands on
+// the canvas outside these two overlays already aims-and-fires exactly like
+// a mouse click does, so a touch player just taps/drags on the play field
+// with their right thumb while their left thumb works the joystick.
+(function bindTouchControls(){
+  const joy = document.getElementById('touchJoystick');
+  const knob = document.getElementById('touchJoystickKnob');
+  if (joy && knob) {
+    const RADIUS = 38; // px the knob may travel from center — matches style.css's ring size
+    // Diagonal-friendly: a drag can set two directions at once (e.g. up+right)
+    // rather than snapping to the single nearest of 4, so a joystick pushed
+    // to ~45° actually moves diagonally like WASD holding two keys does.
+    const DEADZONE = 10;
+    let joyPointerId = null;
+    function setDir(dx, dy){
+      input.left = dx < -DEADZONE;
+      input.right = dx > DEADZONE;
+      input.up = dy < -DEADZONE;
+      input.down = dy > DEADZONE;
+    }
+    function resetDir(){
+      input.left = input.right = input.up = input.down = false;
+      knob.style.transform = 'translate(-50%,-50%)';
+    }
+    joy.addEventListener('pointerdown', (e) => {
+      Sound.unlock();
+      joyPointerId = e.pointerId;
+      joy.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    joy.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== joyPointerId) return;
+      const rect = joy.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      let dx = e.clientX - cx, dy = e.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > RADIUS) { dx = dx / dist * RADIUS; dy = dy / dist * RADIUS; }
+      knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      setDir(dx, dy);
+      e.preventDefault();
+    });
+    function endJoy(e){
+      if (e.pointerId !== joyPointerId) return;
+      joyPointerId = null;
+      resetDir();
+    }
+    joy.addEventListener('pointerup', endJoy);
+    joy.addEventListener('pointercancel', endJoy);
+    joy.addEventListener('lostpointercapture', () => { if (joyPointerId != null) { joyPointerId = null; resetDir(); } });
+  }
+
+  // One-shot action buttons — a plain pointerdown -> tryX() call, same API
+  // the keyboard handler above uses (game.tryPlaceBomb/tryUseActive/
+  // tryUsePill/tryUseStar/tryDonate/tryReroll/tryArcadeInteract), so a touch
+  // button can never drift out of sync with what the key it mirrors does.
+  function bindTap(id, fn){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('pointerdown', (e) => {
+      Sound.unlock();
+      e.preventDefault();
+      fn();
+    });
+  }
+  bindTap('touchBombBtn', () => game && game.tryPlaceBomb());
+  bindTap('touchActiveBtn', () => game && game.tryUseActive());
+  bindTap('touchPillBtn', () => game && game.tryUsePill());
+  bindTap('touchStarBtn', () => game && game.tryUseStar());
+  bindTap('touchDonateBtn', () => game && game.tryDonate());
+  bindTap('touchRerollBtn', () => game && game.tryReroll());
+  bindTap('touchArcadeBtn', () => game && game.tryArcadeInteract());
+  bindTap('touchPauseBtn', () => togglePause());
+
+  // Turret build is a HELD action (see the `input.build` comment up top) —
+  // held for as long as the button is pressed, released on lift/cancel/drag-
+  // off exactly like lifting a held key would (pointerleave covers a thumb
+  // sliding off the button without a clean pointerup, which happens often
+  // on a small touch target).
+  const turretBtn = document.getElementById('touchTurretBtn');
+  if (turretBtn) {
+    const startBuild = (e) => { Sound.unlock(); e.preventDefault(); input.build = true; };
+    const stopBuild = () => { input.build = false; };
+    turretBtn.addEventListener('pointerdown', startBuild);
+    turretBtn.addEventListener('pointerup', stopBuild);
+    turretBtn.addEventListener('pointercancel', stopBuild);
+    turretBtn.addEventListener('pointerleave', stopBuild);
+  }
+})();
 
 function togglePause(){
   if (!game || (game.state !== 'playing')) return;
@@ -157,19 +255,27 @@ function toggleOverlay(id, buildFn, markSeenFn){
 }
 // clicking the dimmed backdrop (not any of the panel's own content) closes
 // it — a lot of players instinctively try this before hunting for Close
-for (const id of ['achievementsScreen', 'bestiaryScreen']) {
+for (const id of ['achievementsScreen', 'bestiaryScreen', 'skillTreeScreen']) {
   document.getElementById(id).addEventListener('click', (e) => {
     if (e.target.id === id) { Sound.play('uiClick'); e.target.classList.add('hidden'); }
   });
 }
+// separate from the loop above — this one also has to stop any preview
+// track playing (see closeMusicTestPanel), which none of the others need.
+document.getElementById('musicTestScreen').addEventListener('click', (e) => {
+  if (e.target.id === 'musicTestScreen') { Sound.play('uiClick'); closeMusicTestPanel(); e.target.classList.add('hidden'); }
+});
 
 document.getElementById('pauseAchievementsBtn').addEventListener('click', () => openOverlay('achievementsScreen', buildAchievementsPanel, markAchievementsSeen));
 document.getElementById('pauseBestiaryBtn').addEventListener('click', () => openOverlay('bestiaryScreen', buildBestiaryPanel, markBestiarySeenBadge));
+document.getElementById('pauseSkillTreeBtn').addEventListener('click', () => openOverlay('skillTreeScreen', () => { resetSkillTreeCamera(); buildSkillTreePanel(); }));
 document.getElementById('retryBtn').addEventListener('click', () => { Sound.play('uiClick'); returnToMenu(); });
 document.getElementById('winBtn').addEventListener('click', () => { Sound.play('uiClick'); returnToMenu(); });
 
 document.getElementById('achievementsBtn').addEventListener('click', () => openOverlay('achievementsScreen', buildAchievementsPanel, markAchievementsSeen));
 document.getElementById('bestiaryBtn').addEventListener('click', () => openOverlay('bestiaryScreen', buildBestiaryPanel, markBestiarySeenBadge));
+document.getElementById('skillTreeBtn').addEventListener('click', () => openOverlay('skillTreeScreen', () => { resetSkillTreeCamera(); buildSkillTreePanel(); }));
+document.getElementById('musicTestBtn').addEventListener('click', () => { Sound.unlock(); openOverlay('musicTestScreen', buildMusicTestPanel); });
 
 // a small "NEW" badge on the main menu's Achievements button whenever
 // something unlocked since the last time that panel was actually opened —
@@ -198,6 +304,29 @@ document.getElementById('bestiaryCloseBtn').addEventListener('click', () => {
   Sound.play('uiClick');
   document.getElementById('bestiaryScreen').classList.add('hidden');
 });
+document.getElementById('skillTreeCloseBtn').addEventListener('click', () => {
+  Sound.play('uiClick');
+  document.getElementById('skillTreeScreen').classList.add('hidden');
+});
+document.getElementById('musicTestCloseBtn').addEventListener('click', () => {
+  Sound.play('uiClick');
+  closeMusicTestPanel();
+  document.getElementById('musicTestScreen').classList.add('hidden');
+});
+
+// small badge on the main menu's Skill Tree button showing how many points
+// are waiting to be spent — unlike the Achievements/Bestiary "NEW" badges
+// (which are seen/unseen flags), this one just mirrors the live point count
+// and hides itself once there's nothing to spend
+function refreshSkillTreeBadge(){
+  const badge = document.getElementById('skillTreePointsBadge');
+  if (!badge) return;
+  const unlocks = ensureUnlockShape(loadUnlocks());
+  const points = unlocks.skillTree.points;
+  badge.textContent = String(points);
+  badge.classList.toggle('hidden', points <= 0);
+  if (unlocks.skillTree.lifetimeEarned) badge.title = unlocks.skillTree.lifetimeEarned + ' points earned over your lifetime';
+}
 
 const muteBtn = document.getElementById('muteBtn');
 function syncMuteBtn(){
@@ -296,6 +425,36 @@ if (fullscreenBtn) {
   }
 }
 
+/* ---------------- screenshot button ---------------- */
+// Phase 13 visual pass (batch 1) — saves the raw game canvas as a PNG.
+// Shown/hidden every frame the same way the touch controls sync themselves
+// (loop() below already runs at 60fps regardless), so it appears the instant
+// a run starts and disappears the instant you're back at a menu screen.
+const screenshotBtn = document.getElementById('screenshotBtn');
+if (screenshotBtn) {
+  screenshotBtn.addEventListener('click', () => {
+    const canvas = document.getElementById('game');
+    if (!canvas) return;
+    Sound.play('uiClick');
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'nightfall-charge-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // revoke on a delay, not synchronously — some browsers need the
+        // object URL to survive past the click's own event loop turn
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }, 'image/png');
+    } catch (e) { /* canvas tainted or toBlob unsupported — silently skip, nothing to recover */ }
+    screenshotBtn.classList.remove('flash'); void screenshotBtn.offsetWidth; screenshotBtn.classList.add('flash');
+  });
+}
+
 /* ---------------- screen wake lock ---------------- */
 // a controller-only stretch of a run (no keyboard/mouse events for a while)
 // would otherwise let the screen dim mid-fight. Held only while actually
@@ -359,7 +518,8 @@ const MENU_TIPS = [
   'The Bestiary (C) fills in as you play: kills, pickups, and destroyed objects all count toward it.',
   'Crystal and Sombra rooms have a better chance of spawning right next to the boss room on even floors.',
   'Standing near an item pedestal shows what it does before you commit to grabbing it.',
-  'Donation machines cap at 1000c lifetime — across every run, never reset.',
+  'Donation machines cap at 5000c lifetime — across every run, never reset.',
+  'Every 25c you donate is worth a skill point, on top of any milestone reward.',
   'Achievements (T) show live progress toward anything with a numeric threshold.',
   'A Cursed Chest costs hearts to open, but is far more likely to hold an item.',
   'Bombs destroy rocks, hazards, turrets, and stone chests alike — always worth carrying a few.',
@@ -372,6 +532,7 @@ function showMenuTip(){
 }
 
 function startGameWithClass(classId){
+  Sound.stopAmbient();
   document.getElementById('mainMenu').classList.add('hidden');
   document.getElementById('gameOverScreen').classList.add('hidden');
   document.getElementById('winScreen').classList.add('hidden');
@@ -385,15 +546,22 @@ function startGameWithClass(classId){
 
 function returnToMenu(){
   releaseWakeLock();
+  Sound.stopMusic(); // in case the run ended mid-track (e.g. died in the Crypt) — see audio.js's startMusic/game.js's startFloor
   game = null;
   document.getElementById('gameScreen').classList.add('hidden');
   document.getElementById('gameOverScreen').classList.add('hidden');
   document.getElementById('winScreen').classList.add('hidden');
   document.getElementById('pauseScreen').classList.add('hidden');
   document.getElementById('mainMenu').classList.remove('hidden');
+  // Phase 13 visual pass — screenshotBtn is otherwise shown by ui.js
+  // updateHUD each in-run frame; that loop stops the instant we're back at
+  // the menu, so it has to be hidden explicitly here or it'd stick around.
+  const shotBtn = document.getElementById('screenshotBtn');
+  if (shotBtn) shotBtn.classList.add('hidden');
   buildClassSelect(startGameWithClass);
   buildSuperbossTrophies();
   updateLifetimeStatsDisplay();
+  Sound.startAmbient();
 }
 
 // a quiet one-line summary of everything banked across every run so far —
@@ -412,6 +580,7 @@ function updateLifetimeStatsDisplay(){
   }
   refreshAchievementsBadge();
   refreshBestiaryBadge();
+  refreshSkillTreeBadge();
   showMenuTip();
 }
 
@@ -519,6 +688,10 @@ function loop(now){
         if (game.runElapsed <= 480) unlockAchievement('challenge_speedrun_8min', game);
       }
     }
+  } else {
+    // `game` is null exactly while the main menu is the visible screen
+    // (see startGameWithClass/returnToMenu) — see ui/menu-backdrop.js.
+    renderMenuBackdrop(dt);
   }
   rafId = requestAnimationFrame(loop);
 }
@@ -541,3 +714,4 @@ startLoop();
 buildClassSelect(startGameWithClass);
 buildSuperbossTrophies();
 updateLifetimeStatsDisplay();
+Sound.startAmbient(); // silent until the first unlock()-triggering gesture — see audio.js

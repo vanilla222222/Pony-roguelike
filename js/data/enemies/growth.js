@@ -85,6 +85,21 @@ function bossHpScale(floorNum){ return Math.pow(BOSS_HP_GROWTH, floorNum || 0); 
 const BOSS_DMG_GROWTH = 1.06;
 function bossDmgScale(floorNum){ return Math.pow(BOSS_DMG_GROWTH, floorNum || 0); }
 
+// Phase 15 — the miniboss room's occupant (entities.js's Miniboss class)
+// sits on its own curve, deliberately between trash (1.20) and a real boss
+// (1.36): a miniboss room is optional (25% per floor) and rarer than either
+// a guaranteed boss room or the several-per-floor trash packs, so it should
+// read as "a real spike, but not THE spike" — hp grows faster than trash so
+// it can't be authored as "just a big trash mob", but stays under the boss
+// rate so a floor's actual Boss room is never overshadowed by an optional
+// side room. Damage reuses bossDmgScale outright — hearts are punishing
+// enough that a second, only-slightly-different damage curve isn't worth
+// authoring, and "hits about as hard as a boss, but has less HP" is exactly
+// the intended miniboss identity (a glass-cannon-ish detour, not a wall).
+const MINIBOSS_HP_GROWTH = 1.28;
+function minibossHpScale(floorNum){ return Math.pow(MINIBOSS_HP_GROWTH, floorNum || 0); }
+function minibossDmgScale(floorNum){ return bossDmgScale(floorNum); }
+
 // Player-side damage that isn't the player's own attack stat has to ride a
 // depth curve too, or it silently dies out: a flat 4-damage bomb is a room
 // wipe on Floor 1 and a rounding error on Floor 10. Both ride the gentler
@@ -92,4 +107,98 @@ function bossDmgScale(floorNum){ return Math.pow(BOSS_DMG_GROWTH, floorNum || 0)
 function explosionDamage(floorNum){ return Math.max(1, Math.round(4 * bossHpScale(floorNum))); }
 // poison ticks (combat.js updateStatusEffects) and Spiked Barding contact
 function statusTickDamage(floorNum){ return Math.max(1, Math.round(0.6 * bossHpScale(floorNum))); }
+
+/* ============================================================
+   STAGE DIFFICULTY MULTIPLIER — a second, stage-keyed layer that
+   rides ON TOP of the per-floor curves above.
+
+   WHY: the per-floor curves are smooth and content-blind; they say
+   nothing about *which* stage you are standing in. The skill tree
+   is meant to stop being optional flavor somewhere around the
+   Desert, and the only honest way to say that is to make the back
+   half of the game harder than its authored numbers alone imply.
+   This layer is the single central knob for that, so retuning it
+   never means touching one of the ~hundreds of authored enemy,
+   boss, or superboss table entries — those stay pure identity.
+
+   THE CURVE (indexed by stages.js's stageIndexForFloor):
+     stage 0 (Crypt, floors 0-1)   1.00  <- hard constraint: no change
+     stage 1 (Forest, floors 2-3)  1.00  <- hard constraint: no change
+     stage 2 (Desert, floors 4-5)  1.18
+     stage 3 (Inferno + every branch floor 6-14) 1.30
+     stages 4-13 (the Phase 10 floors 15-34)  1.34 .. 1.70, +0.04/stage
+
+   Why the jump 1.00 -> 1.18 -> 1.30 and then only +0.04 a stage: the
+   legacy stages 2-3 were authored against a much shorter run and are
+   the place the difficulty complaint actually bites, so they take the
+   real step. The Phase 10 stages already carry their own steeply
+   escalating AUTHORED stats on top of enemyHpScale/bossHpScale (which
+   are themselves ~1.20^30 / ~1.36^30 down there); multiplying an
+   already-extreme number by another 1.5x would be slapstick, not
+   difficulty. The gentle +4%/stage keeps the "later is harder than its
+   own baseline" promise without compounding into nonsense.
+
+   WHAT IT TOUCHES: hp (full multiplier), speed and every `*Cooldown`
+   tuning field (a 35% share of it, see stageAggressionMult), and trash
+   `dmg` (a 50% share, see stageDamageMult). It deliberately does NOT
+   push boss dmg: combat-1.js's playerDamageAmount hard-caps ANY single
+   hit at 4 hearts, and bossDmgScale alone is already far past that cap
+   by the Inferno, so every extra point there would be discarded.
+
+   It composes as a plain extra FACTOR alongside main.js's
+   difficultyStatMult (easy 0.75 / normal 1 / hard 1.5) — the two
+   multiply, they do not replace each other.
+   ------------------------------------------------------------ */
+const STAGE_DIFFICULTY_HP = [
+  1.00, 1.00,                                     // 0 Crypt, 1 Forest — untouched
+  1.18, 1.30,                                     // 2 Desert, 3 Inferno + branches
+  1.34, 1.38, 1.42, 1.46, 1.50,                   // 4-8   (Phase 10)
+  1.54, 1.58, 1.62, 1.66, 1.70                    // 9-13  (Phase 10)
+];
+// how much of the HP multiplier's "extra" carries into speed / fire rate.
+// Aggression is far more punishing per point than HP is, so it takes a
+// share, not the whole thing: at stage 3's 1.30 that is +10.5% speed.
+const STAGE_AGGRESSION_SHARE = 0.35;
+// and how much carries into trash contact/bolt damage — see the cap note above.
+const STAGE_DAMAGE_SHARE = 0.5;
+
+// Defensive `typeof` guard: index.html loads growth.js BEFORE stages.js.
+// Function declarations make that irrelevant at call time (nothing here runs
+// during load), but the guard means a future load-order change degrades to
+// "no stage multiplier" instead of throwing mid-spawn.
+function stageDifficultyMult(floorNum){
+  if (typeof stageIndexForFloor !== 'function') return 1;
+  const si = stageIndexForFloor(floorNum || 0);
+  if (!(si >= 2)) return 1; // stages 0-1 are byte-for-byte unchanged
+  const m = STAGE_DIFFICULTY_HP[si];
+  return (typeof m === 'number') ? m : STAGE_DIFFICULTY_HP[STAGE_DIFFICULTY_HP.length - 1];
+}
+function stageAggressionMult(floorNum){
+  return 1 + (stageDifficultyMult(floorNum) - 1) * STAGE_AGGRESSION_SHARE;
+}
+function stageDamageMult(floorNum){
+  return 1 + (stageDifficultyMult(floorNum) - 1) * STAGE_DAMAGE_SHARE;
+}
+
+// The AI functions read cooldown tunings straight off the shared type object
+// (`t.fireCooldown || 1.5`, in a few hundred places across ai-*.js), so the
+// only non-invasive way to speed a stage's roster up is to hand the spawned
+// entity a retuned COPY of its type. Shallow copy, every own key preserved,
+// only `*Cooldown` numbers divided — nothing in the codebase compares enemy
+// type objects by identity (checked), and `name`/`behavior`/everything else
+// come across untouched.
+// On stages 0-1 the multiplier is exactly 1 and the ORIGINAL object is
+// returned by reference, so the early game allocates nothing new and cannot
+// drift by even a float.
+function stageTunedType(type, floorNum){
+  const a = stageAggressionMult(floorNum);
+  if (!type || !(a > 1)) return type;
+  const out = {};
+  const keys = Object.keys(type);
+  for (let i = 0; i < keys.length; i++){
+    const k = keys[i], v = type[k];
+    out[k] = (typeof v === 'number' && k.length > 8 && k.slice(-8) === 'Cooldown') ? v / a : v;
+  }
+  return out;
+}
 

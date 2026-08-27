@@ -44,6 +44,7 @@ const ROOM_TYPE_ICON = {
   planetarium: '🔭',
   shrine: '🕯️',
   arcade: '🎰',
+  miniboss: '☠️', // Phase 15 — distinct from boss's 💀 so the minimap tells the two apart at a glance
 };
 
 // friendly labels for the minimap legend toggle (see toggleMinimapLegend
@@ -57,6 +58,7 @@ const ROOM_TYPE_LEGEND = {
   planetarium: 'Planetarium (floor 3 only — takes the D-branch)',
   shrine: 'Shrine (blessing paid in coins)',
   arcade: 'Arcade (coin-toll gambling machines)',
+  miniboss: 'Miniboss Room (25% per floor — drops a penny, chest, item, or star)',
 };
 
 // the small "?" button beside the minimap — a lot of the room-type icons
@@ -141,7 +143,14 @@ function drawLootMarkers(ctx, entries, cx, cy){
 // remember what was last actually drawn so an unchanged frame can skip the
 // hearts canvas clear+redraw and the DOM text/class writes entirely. Purely a
 // redundant-work skip — any real change still redraws exactly as it did before.
-const _hudCache = { hearts: null, coins: null, keys: null, bombs: null, leftPanel: null, familiars: null, turrets: null, minions: null, synergy: null };
+const _hudCache = { hearts: null, coins: null, keys: null, bombs: null, leftPanel: null, familiars: null, turrets: null, minions: null, synergy: null, floor: null, hitFlash: null };
+// Phase 13 visual pass (batch 1) — retriggers a CSS "bump" class the same
+// remove/reflow/re-add way .item-examine-icon.examine-pop restarts, so it
+// replays correctly even if the previous bump animation hasn't finished.
+function _hudBump(el, cls){
+  if (!el) return;
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+}
 
 // Phase 6a overhaul — one entry per synergy badge span (index.html's
 // #synergyBar), the player.<flag>Active field it reads (see items.js's
@@ -231,39 +240,77 @@ function updateHUD(game){
   // a pulsing red edge-vignette once you're down to a heart or less — the
   // heart display itself is easy to lose track of mid-fight, this isn't
   const canvasWrap = document.getElementById('canvasWrap');
-  if (canvasWrap) canvasWrap.classList.toggle('low-health', player.totalHearts() <= 1);
+  const lowHealth = player.totalHearts() <= 1;
+  if (canvasWrap) canvasWrap.classList.toggle('low-health', lowHealth);
+  // Phase 12 visual pass (batch 3) — the SAME danger cue, mirrored onto the
+  // hearts row itself, since that's where the player's eye is actually
+  // looking to check remaining HP, not the canvas edges.
+  const heartsRow = document.getElementById('hearts');
+  if (heartsRow) heartsRow.classList.toggle('low-health', lowHealth);
 
   if (player.coins !== _hudCache.coins) {
+    const firstRun = _hudCache.coins === null;
     _hudCache.coins = player.coins;
     document.querySelector('#resCoins b').textContent = Util.formatNum(player.coins);
+    // Phase 13 visual pass — skip the bump on the very first HUD paint (that's
+    // not a "change", it's the initial value appearing) and only bump on a
+    // pickup, not on spending, so the shop doesn't flash gold every purchase.
+    if (!firstRun && player.coins > (_hudCache._prevCoins || 0)) _hudBump(document.getElementById('resCoins'), 'res-bump');
+    _hudCache._prevCoins = player.coins;
   }
   const keysEl = document.getElementById('resKeys'), bombsEl = document.getElementById('resBombs');
   // the '∞' forms fold the unlimited-floor flags into the cached string, so a
   // flag flipping is itself a change the dirty-check catches
   const keysText = player.unlimitedKeysFloor ? '∞' : String(player.keys);
   if (keysText !== _hudCache.keys) {
+    const keysUp = _hudCache.keys !== null && player.keys > (_hudCache._prevKeys || 0);
     _hudCache.keys = keysText;
+    _hudCache._prevKeys = player.keys;
     keysEl.querySelector('b').textContent = keysText;
     // a quiet "you're out" cue instead of just a silent 0 — see style.css .res-empty
     keysEl.classList.toggle('res-empty', !player.unlimitedKeysFloor && player.keys === 0);
+    if (keysUp) _hudBump(keysEl, 'res-bump'); // Phase 13 visual pass — pop on pickup only
   }
   const bombsText = player.unlimitedBombsFloor ? '∞' : String(player.bombs);
   if (bombsText !== _hudCache.bombs) {
+    const bombsUp = _hudCache.bombs !== null && player.bombs > (_hudCache._prevBombs || 0);
     _hudCache.bombs = bombsText;
+    _hudCache._prevBombs = player.bombs;
     bombsEl.querySelector('b').textContent = bombsText;
     bombsEl.classList.toggle('res-empty', !player.unlimitedBombsFloor && player.bombs === 0);
+    if (bombsUp) _hudBump(bombsEl, 'res-bump'); // Phase 13 visual pass — pop on pickup only
   }
   // floorLabelFor/floorNameFor (stages.js) so a C-branch run reads '7C — Rainforest ...' rather than the normal floor of the same floorNum
-  document.querySelector('#resFloor b').textContent = floorLabelFor(game.dungeon.floorNum, game.floorPath) + ' — ' + floorNameFor(game.dungeon.floorNum, game.floorPath);
+  const floorText = floorLabelFor(game.dungeon.floorNum, game.floorPath) + ' — ' + floorNameFor(game.dungeon.floorNum, game.floorPath);
+  if (floorText !== _hudCache.floor) {
+    const notFirstRun = _hudCache.floor !== null;
+    _hudCache.floor = floorText;
+    document.querySelector('#resFloor b').textContent = floorText;
+    if (notFirstRun) _hudBump(document.getElementById('resFloor'), 'floor-bump'); // Phase 13 visual pass
+  }
+
+  // Phase 13 visual pass (batch 1) — one-shot screen flash on a landed hit
+  // (entities.js takeDamage stamps player._hitFlashAt) and the screenshot
+  // button's mid-run-only visibility, both piggybacking on this same
+  // once-per-frame HUD pass rather than adding a second update loop.
+  if (player._hitFlashAt && player._hitFlashAt !== _hudCache.hitFlash) {
+    _hudCache.hitFlash = player._hitFlashAt;
+    _hudBump(canvasWrap, 'hit-flash');
+  }
+  const screenshotBtn = document.getElementById('screenshotBtn');
+  if (screenshotBtn) screenshotBtn.classList.remove('hidden');
 
   // Engineer Pony turret / Changeling Queen minion counters — only visible
   // for the class that can actually use them (player.canBuildTurrets /
   // player.summonsChangelings, see data/core.js's CLASSES), hidden via the
   // shared .hidden utility class for every other class.
   const turretsEl = document.getElementById('resTurrets');
+  // Phase 11 un-bleed pass — same OR set as updateTurretBuild (combat-1.js):
+  // Mule/Dnbpony/Alicorn/Crystal Pony each have their own turret-family flag now.
+  const hasTurretAbility = !!(player.canBuildTurrets || player.canPlantMarkers || player.canDropStacks || player.canConjureWards || player.canPlantSentries);
   if (turretsEl) {
-    turretsEl.classList.toggle('hidden', !player.canBuildTurrets);
-    if (player.canBuildTurrets) {
+    turretsEl.classList.toggle('hidden', !hasTurretAbility);
+    if (hasTurretAbility) {
       const count = (game.currentRoom.playerTurrets || []).length;
       const turretsText = count + '/3';
       if (turretsText !== _hudCache.turrets) {
@@ -272,10 +319,19 @@ function updateHUD(game){
       }
     }
   }
+  // Touch action bar's turret button (Phase 12 mobile pass, js/ui/touch-
+  // controls.js) — same OR set as the resTurrets HUD chip just above, so
+  // the on-screen button only ever appears for a class that can actually
+  // build turrets, exactly like the desktop counter does.
+  const touchTurretBtn = document.getElementById('touchTurretBtn');
+  if (touchTurretBtn) touchTurretBtn.classList.toggle('hidden', !hasTurretAbility);
+
   const minionsEl = document.getElementById('resMinions');
+  // Phase 11 un-bleed pass — same OR set as updateChangelingSummons (combat-1.js).
+  const hasMinionSummon = !!(player.summonsChangelings || player.summonsRoostmates || player.summonsThralls || player.summonsHive || player.summonsBrood);
   if (minionsEl) {
-    minionsEl.classList.toggle('hidden', !player.summonsChangelings);
-    if (player.summonsChangelings) {
+    minionsEl.classList.toggle('hidden', !hasMinionSummon);
+    if (hasMinionSummon) {
       const minionsText = (player.changelingMinions || []).length + '/' + player.maxChangelingMinions;
       if (minionsText !== _hudCache.minions) {
         _hudCache.minions = minionsText;
@@ -288,11 +344,28 @@ function updateHUD(game){
   // familiar bank's famKey above
   const synKey = SYNERGY_BADGES.map(s => player[s.flag] ? '1' : '0').join('');
   if (synKey !== _hudCache.synergy) {
+    const prevKey = _hudCache.synergy || '';
     _hudCache.synergy = synKey;
-    for (const s of SYNERGY_BADGES) {
+    SYNERGY_BADGES.forEach((s, i) => {
       const el = document.getElementById(s.id);
-      if (el) el.classList.toggle('active', !!player[s.flag]);
-    }
+      if (!el) return;
+      const isActive = !!player[s.flag];
+      el.classList.toggle('active', isActive);
+      // Phase 12 visual pass (batch 3) — a badge that just flipped ON (not
+      // one that was already active before this HUD update) gets a one-shot
+      // flash, so "you just met this synergy's requirement mid-run" reads
+      // as an EVENT rather than silently blending into the badge just
+      // sitting there lit already. Force-restart via remove+reflow+re-add
+      // (classList.add alone is a no-op if the class already lingers from a
+      // rapid double-toggle) — style.css's animation removes the class
+      // itself via `animation-fill-mode` never lingering past its own
+      // duration, so no cleanup timer is needed here.
+      if (isActive && prevKey[i] !== '1') {
+        el.classList.remove('just-activated');
+        void el.offsetWidth;
+        el.classList.add('just-activated');
+      }
+    });
   }
 
   const iconEl = document.getElementById('activeItemIcon');
@@ -313,6 +386,11 @@ function updateHUD(game){
     iconEl.textContent = '—'; iconEl.title = ''; pipsEl.innerHTML = '';
     iconEl.classList.remove('ready-glow');
   }
+  // Touch action bar (Phase 12 mobile pass) mirrors the same three
+  // ready-glow states as their desktop HUD icon counterparts above, so a
+  // touch player gets the identical "this is usable right now" pulse.
+  const touchActiveBtn = document.getElementById('touchActiveBtn');
+  if (touchActiveBtn) touchActiveBtn.classList.toggle('ready-glow', !!player.activeItem && player.activeCharge >= player.activeItem.maxCharge);
 
   const trinketEl = document.getElementById('trinketIcon');
   if (trinketEl) {
@@ -337,6 +415,8 @@ function updateHUD(game){
     pillEl.classList.toggle('empty', !color);
     pillEl.classList.toggle('ready-glow', !!color);
   }
+  const touchPillBtn = document.getElementById('touchPillBtn');
+  if (touchPillBtn) touchPillBtn.classList.toggle('ready-glow', !!(player.pillPocket));
 
   const starEl = document.getElementById('starIcon');
   if (starEl) {
@@ -348,6 +428,8 @@ function updateHUD(game){
     starEl.classList.toggle('empty', !star);
     starEl.classList.toggle('ready-glow', !!star);
   }
+  const touchStarBtn = document.getElementById('touchStarBtn');
+  if (touchStarBtn) touchStarBtn.classList.toggle('ready-glow', !!(player.starPocket));
 
   const cooldown = player.attackType === 'melee' ? player.meleeCooldown : player.fireCooldown;
   const dmg = player.attackType === 'melee' ? player.meleeDamage : player.rangedDamage;
@@ -567,8 +649,15 @@ function drawMinimap(game){
 let _toastTimer = null;
 let _toastQueue = [];
 let _toastShowing = false;
-function toast(msg, long){
-  _toastQueue.push({ msg, long });
+// Phase 12 visual pass — optional 3rd arg `kind` ('good'|'bad'|'info'), a
+// left-accent color tint (style.css's .toast-good/.toast-bad/.toast-info)
+// so a toast can read as "this happened TO you" at a glance instead of
+// every single one — routine "room cleared" through "achievement unlocked"
+// — sharing one identical neutral look. Omitting it keeps the original
+// plain look exactly as before; only a handful of call sites bother to
+// pass one.
+function toast(msg, long, kind){
+  _toastQueue.push({ msg, long, kind });
   if (!_toastShowing) advanceToastQueue();
 }
 function advanceToastQueue(){
@@ -577,6 +666,8 @@ function advanceToastQueue(){
   if (!next) { _toastShowing = false; return; }
   _toastShowing = true;
   el.textContent = next.msg;
+  el.classList.remove('toast-good', 'toast-bad', 'toast-info');
+  if (next.kind) el.classList.add('toast-' + next.kind);
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => {
@@ -586,10 +677,23 @@ function advanceToastQueue(){
 }
 
 let _bannerTimer = null;
-function showRoomBanner(text){
+// Phase 12 visual pass — `roomType` is optional (every existing call site
+// keeps working unchanged if omitted); when given, the banner's glow tints
+// toward that room type's own minimap color (roomTypeColor, above) instead
+// of the flat gold every room used to announce itself in, so a boss room's
+// entrance READS as more urgent than a shop's at a glance, before the
+// player even finishes reading the text.
+function showRoomBanner(text, roomType){
   const el = document.getElementById('roomBanner');
-  el.textContent = text;
+  // Phase 12 visual pass (batch 3) — prefix the same glyph the minimap
+  // already uses for this room type (ROOM_TYPE_ICON), so the banner reads
+  // at a glance even before the text itself is read. Room types with no
+  // icon (normal, gate rooms, arcade) fall back to the plain text exactly
+  // as before.
+  const icon = roomType && ROOM_TYPE_ICON[roomType];
+  el.textContent = icon ? icon + '  ' + text : text;
   el.classList.add('show');
+  el.style.setProperty('--banner-color', roomType ? roomTypeColor(roomType) : '');
   clearTimeout(_bannerTimer);
   _bannerTimer = setTimeout(() => el.classList.remove('show'), 1600);
 }
@@ -598,12 +702,26 @@ function showRoomBanner(text){
 // itemPedestal you're standing near (see game.js's updateItemExamine), or
 // null/undefined to hide it. Works for items, trinkets, and familiars alike
 // since they all ride the same pedestal shape — see room.js.
+let _lastExaminePed = null; // Phase 12 visual pass — see the icon-pop comment below
 function showItemExamine(ped){
   const el = document.getElementById('itemExamine');
-  if (!ped) { el.classList.remove('show'); return; }
+  if (!ped) { el.classList.remove('show'); _lastExaminePed = null; return; }
   const thing = ped.item;
   const kindLabel = ped.isTrinket ? 'Trinket' : ped.isFamiliar ? 'Familiar' : ped.isStar ? 'Star' : (thing.type === 'active' ? 'Active Item' : 'Passive Item');
-  document.getElementById('itemExamineIcon').textContent = thing.icon;
+  const iconEl = document.getElementById('itemExamineIcon');
+  iconEl.textContent = thing.icon;
+  // updateItemExamine (game.js) calls this every single frame the player is
+  // in range, not just on a change — so the icon's entrance pop must only
+  // (re)play when the examined pedestal actually CHANGES (a fresh item came
+  // into range), never on every identical re-call while standing still,
+  // which would otherwise jiggle constantly. `ped` itself is a stable object
+  // reference per pedestal, so an identity check is enough.
+  if (ped !== _lastExaminePed) {
+    _lastExaminePed = ped;
+    iconEl.classList.remove('examine-pop');
+    void iconEl.offsetWidth; // force a reflow so the browser forgets the animation already ran
+    iconEl.classList.add('examine-pop');
+  }
   document.getElementById('itemExamineName').textContent = thing.name;
   document.getElementById('itemExamineQuality').textContent = thing.quality
     ? kindLabel + ' — ' + '★'.repeat(thing.quality) + '☆'.repeat(4 - thing.quality)
@@ -616,11 +734,17 @@ function buildClassSelect(onPick){
   const wrap = document.getElementById('classSelect');
   wrap.innerHTML = '';
   const unlocks = loadUnlocks();
+  let _cardIndex = 0; // Phase 12 visual pass — drives the staggered entrance animation below (style.css's .class-card, animation-delay)
   for (const id in CLASSES) {
     const def = CLASSES[id];
     const unlocked = def.unlocked || !!unlocks[id];
     const card = document.createElement('div');
     card.className = 'class-card' + (unlocked ? '' : ' locked');
+    // Cap the delay rather than letting it grow unbounded across 25+
+    // characters — past ~16 cards the stagger has already read as "the grid
+    // is filling in", so every card beyond that just uses the same final
+    // delay instead of visibly trickling in one-by-one for a second+.
+    card.style.animationDelay = (Math.min(_cardIndex++, 16) * 28) + 'ms';
 
     const canvas = document.createElement('canvas');
     canvas.width = 120; canvas.height = 90;
@@ -656,6 +780,48 @@ function buildClassSelect(onPick){
     card.appendChild(p);
     // .class-card.locked::after already draws the 🔒 corner badge — see style.css
 
+    // Per-route superboss-defeat indicator (Phase 10) — three small badges,
+    // one per route (SUPERBOSS_ROUTE_ORDER, from data/enemies/superboss-
+    // routes.js: 'main' labelled "A/B", 'C', 'D'), each "beaten/total" for
+    // superbosses THIS class specifically has killed (unlocks.
+    // classSuperbossDefeats[classId], written by game.js's onBossDefeated —
+    // separate from the older unlocks.superbossDefeats global counter that
+    // buildSuperbossTrophies below already uses, which has no per-class
+    // dimension). Locked characters show none — there's nothing to report.
+    if (unlocked) {
+      const classDefeats = (unlocks.classSuperbossDefeats && unlocks.classSuperbossDefeats[id]) || {};
+      const routeCounts = {};
+      for (const route of SUPERBOSS_ROUTE_ORDER) routeCounts[route] = { beaten: 0, total: 0 };
+      for (const boss of SUPERBOSS_LIST) {
+        const route = SUPERBOSS_ROUTE[boss.id] || 'main';
+        routeCounts[route].total++;
+        if (classDefeats[boss.id]) routeCounts[route].beaten++;
+      }
+      const routesRow = document.createElement('div');
+      routesRow.className = 'class-superboss-routes';
+      for (const route of SUPERBOSS_ROUTE_ORDER) {
+        const rc = routeCounts[route];
+        if (!rc.total) continue; // defensive — every route has entries today, but don't render an empty badge if one ever didn't
+        const badge = document.createElement('span');
+        badge.className = 'class-superboss-route'
+          + (rc.beaten > 0 ? ' has-progress' : '')
+          + (rc.beaten === rc.total ? ' complete' : '');
+        badge.textContent = SUPERBOSS_ROUTE_LABELS[route] + ' ' + rc.beaten + '/' + rc.total;
+        // In-game encounter order (SUPERBOSS_ROUTE_SEQUENCE), NOT
+        // SUPERBOSS_LIST's raw object-insertion order — see the comment on
+        // SUPERBOSS_ROUTE_SEQUENCE in superboss-routes.js for exactly which
+        // two bosses that insertion order gets wrong.
+        const names = (SUPERBOSS_ROUTE_SEQUENCE[route] || [])
+          .map(id => SUPERBOSSES[id])
+          .filter(Boolean)
+          .map(b => (classDefeats[b.id] ? '✓ ' : '· ') + b.name)
+          .join('\n');
+        badge.title = SUPERBOSS_ROUTE_LABELS[route] + ' route superbosses beaten by ' + def.name + ':\n' + names;
+        routesRow.appendChild(badge);
+      }
+      card.appendChild(routesRow);
+    }
+
     if (unlocked) {
       card.addEventListener('click', () => { Sound.unlock(); Sound.play('uiClick'); onPick(id); });
     } else {
@@ -671,28 +837,52 @@ function buildSuperbossTrophies(){
   wrap.innerHTML = '';
   const unlocks = loadUnlocks();
   const defeats = unlocks.superbossDefeats || {};
-  for (const boss of SUPERBOSS_LIST) {
-    const count = defeats[boss.id] || 0;
-    const beaten = count > 0;
-    const card = document.createElement('div');
-    card.className = 'trophy' + (beaten ? ' beaten' : ' locked');
+  // Split into the three routes (SUPERBOSS_ROUTE_ORDER: 'main' labelled
+  // "A/B", 'C', 'D' — see data/enemies/superboss-routes.js) instead of one
+  // flat row, each internally in true in-game encounter order
+  // (SUPERBOSS_ROUTE_SEQUENCE, ascending floorNum) rather than SUPERBOSS_
+  // LIST's raw declaration order — that order gets two spots wrong (see the
+  // long comment on SUPERBOSS_ROUTE_SEQUENCE itself), so it's never used
+  // directly for display anywhere any more.
+  for (const route of SUPERBOSS_ROUTE_ORDER) {
+    const bosses = (SUPERBOSS_ROUTE_SEQUENCE[route] || []).map(id => SUPERBOSSES[id]).filter(Boolean);
+    if (!bosses.length) continue;
 
-    const icon = document.createElement('div');
-    icon.className = 'icon';
-    icon.textContent = beaten ? boss.icon : '❓';
-    card.appendChild(icon);
+    const group = document.createElement('div');
+    group.className = 'trophy-route-group';
 
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = beaten ? boss.name : '???';
-    card.appendChild(name);
+    const label = document.createElement('div');
+    label.className = 'trophy-route-label';
+    label.textContent = SUPERBOSS_ROUTE_LABELS[route] + ' route';
+    group.appendChild(label);
 
-    if (beaten) {
-      const countEl = document.createElement('div');
-      countEl.className = 'count';
-      countEl.textContent = count + 'x beaten';
-      card.appendChild(countEl);
+    const row = document.createElement('div');
+    row.className = 'trophy-row';
+    for (const boss of bosses) {
+      const count = defeats[boss.id] || 0;
+      const beaten = count > 0;
+      const card = document.createElement('div');
+      card.className = 'trophy' + (beaten ? ' beaten' : ' locked');
+
+      const icon = document.createElement('div');
+      icon.className = 'icon';
+      icon.textContent = beaten ? boss.icon : '❓';
+      card.appendChild(icon);
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = beaten ? boss.name : '???';
+      card.appendChild(name);
+
+      if (beaten) {
+        const countEl = document.createElement('div');
+        countEl.className = 'count';
+        countEl.textContent = count + 'x beaten';
+        card.appendChild(countEl);
+      }
+      row.appendChild(card);
     }
-    wrap.appendChild(card);
+    group.appendChild(row);
+    wrap.appendChild(group);
   }
 }

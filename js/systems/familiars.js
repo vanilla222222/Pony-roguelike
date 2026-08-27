@@ -32,6 +32,16 @@ function familiarDamage(baseDmg, floorNum){
   return Math.max(1, Math.round((baseDmg || 1) * Math.pow(FAMILIAR_DMG_GROWTH, floorNum || 0)));
 }
 
+// Familiar attack/proc-timer multiplier — factored out of the repeated
+// `player.trinketId === 'swarmcollar' ? 0.85 : 1` ternary below so
+// sk8t_stormcollar (Phase 8e slice 2 — see data/trinkets-2.js) can fold in
+// at every one of the same call sites without duplicating them again.
+function familiarRateMult(player){
+  if (player.trinketId === 'swarmcollar') return 0.85;
+  if (player.trinketId === 'sk8t_stormcollar') return 0.88; // 12% more often
+  return 1;
+}
+
 function updateFamiliars(game, dt){
   for (const f of game.player.familiars) {
     if (f.def.behavior === 'orbiter') updateOrbiterFamiliar(game, f, dt);
@@ -50,6 +60,12 @@ function updateFamiliars(game, dt){
 
 function updateOrbiterFamiliar(game, f, dt){
   const player = game.player, node = game.currentRoom, def = f.def;
+  // Phase 16 — Wasp Whistle's temporary damage buff (items-2.js's
+  // useActiveEffect, 'waspwhistle' case). f.buffMult defaults undefined on
+  // every familiar that isn't currently buffed, so `* (f.buffMult || 1)`
+  // below is a no-op for every familiar in the game except one a Wasp
+  // Whistle has actually touched.
+  if (f.buffTimer > 0) { f.buffTimer -= dt; if (f.buffTimer <= 0) f.buffMult = 1; }
   f.angle += def.orbitSpeed * dt;
   f.x = player.x + Math.cos(f.angle) * def.radius;
   f.y = player.y + Math.sin(f.angle) * def.radius;
@@ -57,7 +73,7 @@ function updateOrbiterFamiliar(game, f, dt){
   for (const e of node.enemies) {
     if (e.isDead) continue;
     if (Util.circleIntersect(f.x, f.y, 9, e.x, e.y, e.radius)) {
-      const dmg = familiarDamage(def.dmg + (player.trinketId === 'houndwhistle' ? 1 : 0), game.dungeon.floorNum);
+      const dmg = familiarDamage((def.dmg + (player.trinketId === 'houndwhistle' ? 1 : 0)) * (f.buffMult || 1), game.dungeon.floorNum);
       const applied = e.takeDamage(dmg, (e.x - f.x) * 0.04, (e.y - f.y) * 0.04);
       if (applied) {
         Sound.play('enemyHit');
@@ -65,7 +81,7 @@ function updateOrbiterFamiliar(game, f, dt){
         if (def.freezeChance && Math.random() < def.freezeChance && !e.isBoss) { e.freezeTimer = Math.max(e.freezeTimer, 1.2); bumpStat('enemiesFrozen', 1, game); }
         if (e.isDead) handleEnemyDeath(game, e);
       }
-      f.contactCooldown = def.contactCooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+      f.contactCooldown = def.contactCooldown * familiarRateMult(player);
       break;
     }
   }
@@ -73,6 +89,8 @@ function updateOrbiterFamiliar(game, f, dt){
 
 function updateShooterFamiliar(game, f, dt){
   const player = game.player, node = game.currentRoom, def = f.def;
+  // Phase 16 — see updateOrbiterFamiliar's matching comment above.
+  if (f.buffTimer > 0) { f.buffTimer -= dt; if (f.buffTimer <= 0) f.buffMult = 1; }
   // Drifts in a slow loose orbit so multiple shooters spread out instead of
   // stacking. REVIEWED AND LEFT ALONE during the rebalance: the 0.6rad/s
   // drift and the 30px hover radius are pure presentation — a shooter fires
@@ -105,11 +123,11 @@ function updateShooterFamiliar(game, f, dt){
   // data.js) — the only two trinkets that touch familiars at all. Both are
   // no-ops (+0 damage, x1 cooldown) for every other trinket, and the base
   // dmg still routes through familiarDamage's depth curve either way.
-  f.fireTimer = def.cooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+  f.fireTimer = def.cooldown * familiarRateMult(player);
   const ang = Math.atan2(nearest.y - f.y, nearest.x - f.x);
   game.projectiles.push(new Projectile(
     f.x, f.y, Math.cos(ang) * def.boltSpeed, Math.sin(ang) * def.boltSpeed,
-    familiarDamage(def.dmg + (player.trinketId === 'houndwhistle' ? 1 : 0), game.dungeon.floorNum), 'familiar',
+    familiarDamage((def.dmg + (player.trinketId === 'houndwhistle' ? 1 : 0)) * (f.buffMult || 1), game.dungeon.floorNum), 'familiar',
     { color: def.color, radius: 4 }
   ));
 }
@@ -200,7 +218,7 @@ function updateThiefFamiliar(game, f, dt){
         }
         if (e.isDead) handleEnemyDeath(game, e);
       }
-      f.contactCooldown = def.contactCooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+      f.contactCooldown = def.contactCooldown * familiarRateMult(player);
       break;
     }
   }
@@ -229,7 +247,7 @@ function updateGrowerFamiliar(game, f, dt){
         game.floatTexts.push(new FloatText(e.x, e.y - 20, String(dmg), '#fff'));
         if (e.isDead) handleEnemyDeath(game, e);
       }
-      f.contactCooldown = def.contactCooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+      f.contactCooldown = def.contactCooldown * familiarRateMult(player);
       break;
     }
   }
@@ -246,7 +264,7 @@ function updateDetonatorFamiliar(game, f, dt){
   f.y += (homeY - f.y) * Math.min(1, dt * 3);
   f.procTimer -= dt;
   if (f.procTimer > 0) return;
-  f.procTimer = def.interval * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+  f.procTimer = def.interval * familiarRateMult(player);
   const radius = def.radius || 70;
   const dmg = familiarDamage(def.dmg + (player.trinketId === 'houndwhistle' ? 1 : 0), game.dungeon.floorNum);
   Sound.play('bombExplode');
@@ -289,7 +307,7 @@ function updateMirrorFamiliar(game, f, dt){
   // outside the cone it just holds fire — the point of a mirror is that it
   // shoots what the player is committing to, not whatever wanders past.
   if (!best || bestDiff > (def.arc || 1.0)) { f.fireTimer = 0.3; return; }
-  f.fireTimer = def.cooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+  f.fireTimer = def.cooldown * familiarRateMult(player);
   const ang = Math.atan2(best.y - f.y, best.x - f.x);
   game.projectiles.push(new Projectile(
     f.x, f.y, Math.cos(ang) * def.boltSpeed, Math.sin(ang) * def.boltSpeed,
@@ -344,7 +362,7 @@ function updateBerserkerFamiliar(game, f, dt){
         game.floatTexts.push(new FloatText(e.x, e.y - 20, String(dmg), '#e35b6a'));
         if (e.isDead) handleEnemyDeath(game, e);
       }
-      f.contactCooldown = def.contactCooldown * (player.trinketId === 'swarmcollar' ? 0.85 : 1);
+      f.contactCooldown = def.contactCooldown * familiarRateMult(player);
       break;
     }
   }

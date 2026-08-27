@@ -354,6 +354,108 @@ function applyStarEffect(game, starId){
       recalcPlayerStats(player);
       break;
     }
+
+    /* ---- Phase 8e — 25 more stars, unlocked via the skill tree (see
+       skilltree-unlocks-stars.js's 'unlock_stars_hub' subtree, not the
+       achievement/superboss reward ladders the two batches above use).
+       Same rule as always: every case below drives a mechanism that
+       already exists in this file or in items/combat. ---- */
+    case 'sk8s_pyrrha': // +4 damage for the rest of this room — Alcyone's pattern
+      player.starDamageBonus += 4;
+      recalcPlayerStats(player);
+      break;
+    case 'sk8s_borealis': // +60% speed for the rest of this room — Electra's pattern
+      player.starSpeedMult = Math.max(player.starSpeedMult, 1.6);
+      break;
+    case 'sk8s_thessaly': // +2 red hearts
+      player.heal(2);
+      break;
+    case 'sk8s_wren': // +3 blue hearts
+      player.healBlue(3);
+      break;
+    case 'sk8s_gilded': // full red heal AND full blue heal — Mizar + Items-2's blueheart-cap pattern
+      player.redCurrent = player.redMax;
+      player.healBlue(999); // clamps to whatever this class's blue cap actually is
+      break;
+    case 'sk8s_cinder': // room-wide nuke, scaled to the floor — Antares/Sirius's pattern
+      damageAllEnemies(game, Math.max(1, Math.round(3 * enemyHpScale(game.dungeon.floorNum))));
+      break;
+    case 'sk8s_frostbind': // freeze every enemy for 6 seconds — Polaris/Phecda's pattern
+      freezeAllEnemies(game, 6);
+      break;
+    case 'sk8s_thornveil': // block the next 2 hits
+      player.shieldHits += 2;
+      break;
+    case 'sk8s_aegis': // 15s of invincibility — Alkaid/Scheat's pattern
+      player.invincibleTimer = Math.max(player.invincibleTimer, 15);
+      break;
+    case 'sk8s_venomkiss':
+      if (!applyRoomWideStatus(game, 'poisonTimer', 8, 'statusPoison')) return refundStar(game, starId, 'Nothing here to poison.');
+      break;
+    case 'sk8s_dreadhowl':
+      if (!applyRoomWideStatus(game, 'fearTimer', 6, 'statusFear')) return refundStar(game, starId, 'No one here to frighten.');
+      break;
+    case 'sk8s_puppeteer': { // charm ONLY the strongest enemy — Algol's target-picking, Mintaka's charm
+      const targets = game.currentRoom.enemies.filter(e => !e.isDead && !e.isBoss);
+      if (!targets.length) return refundStar(game, starId, 'No one here to charm.');
+      let strongest = targets[0];
+      for (const e of targets) if (e.hp > strongest.hp) strongest = e;
+      strongest.charmTimer = Math.max(strongest.charmTimer, 14);
+      Sound.play('statusCharm');
+      break;
+    }
+    case 'sk8s_direstrike': { // Algol's target-picking, Shaula's percentage-of-current-hp damage
+      const alive = game.currentRoom.enemies.filter(e => !e.isDead && !e.isBoss);
+      if (!alive.length) return refundStar(game, starId, 'Nothing here to strike.');
+      let strongest = alive[0];
+      for (const e of alive) if (e.hp > strongest.hp) strongest = e;
+      if (strongest.takeDamage(strongest.hp * 0.75, 0, 0) && strongest.isDead) handleEnemyDeath(game, strongest);
+      break;
+    }
+    case 'sk8s_gale': // a lighter knockback nova — Saiph/Kaus Australis's pattern
+      knockbackNova(game, 5);
+      break;
+    case 'sk8s_fortune': // +1 Luck for the rest of the run — Spica's pattern
+      player.luckyPennies += 1;
+      recalcPlayerStats(player);
+      break;
+    case 'sk8s_farsight': // +1 tile of attack range for the rest of the run — Izar's pattern
+      player.starRangeBonus = (player.starRangeBonus || 0) + 1;
+      recalcPlayerStats(player);
+      break;
+    case 'sk8s_battery': // fully recharge the active item — Merak's pattern
+      if (!player.activeItem) return refundStar(game, starId, 'No active item to charge.');
+      player.activeCharge = player.activeItem.maxCharge;
+      break;
+    case 'sk8s_cartographer': // reveal the whole floor — Alnitak's pattern
+      player.eyeUsed = true;
+      player.revealMap = true;
+      break;
+    case 'sk8s_demolition': // destroy every object in the room — Taygeta's pattern
+      destroyAllObstacles(game);
+      break;
+    case 'sk8s_prospector': // drop 5 coins
+      scatterStarPickups(game, 'coin', 5);
+      break;
+    case 'sk8s_medic': // drop 3 hearts
+      scatterStarPickups(game, 'heartRed', 3);
+      break;
+    case 'sk8s_quartermaster': // drop 2 keys and 2 bombs
+      scatterStarPickups(game, 'key', 2);
+      scatterStarPickups(game, 'bomb', 2);
+      break;
+    case 'sk8s_alchemist': // drop 3 pills
+      scatterStarPickups(game, 'pill', 3);
+      break;
+    case 'sk8s_pyroclast': // drop 4 bombs
+      scatterStarPickups(game, 'bomb', 4);
+      break;
+    case 'sk8s_shrine': { // a free item pedestal — Pollux's pattern
+      const node = game.currentRoom;
+      const spot = findClearFloorSpot(node, Math.floor(player.x / TILE), Math.floor(player.y / TILE) - 1);
+      addItemOrTrinketPedestal(node, itemPoolForRoomType(node.type), spot.x, spot.y);
+      break;
+    }
   }
   Sound.play('itemGet');
   game.toast(star.name + ' — ' + star.desc);

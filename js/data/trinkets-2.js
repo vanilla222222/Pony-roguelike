@@ -894,5 +894,83 @@ Object.assign(TRINKETS, {
     unlockedBy:'slayer_shadowhulk_t3', desc:'A veil cut from the dark a shadow hulk ambushes out of — attacks and shots recharge 8% faster.' },
   hollowdriftpouch: { id:'hollowdriftpouch', name:'Hollow Drift Pouch', icon:'👛', color:'#6a7290', locked:true, pendingReward:true,
     unlockedBy:'challenge_voidbetween_8d_frugal', desc:'Not a single coin spent, all the way through the cold drift. -5% shop prices.' },
+
+  /* ---- Phase 7h (cont.) — The Void Between PART 2 capstone trinkets
+     (js/achievements/defs-12.js) — pendingReward:true so SUPERBOSS_REWARDS's
+     TRINKET_LIST.filter sweep (defs-1.js) skips them, same as every other
+     single-achievement-reserved trinket above. ---- */
+  nullsummonschit: { id:'nullsummonschit', name:'Null Summons Chit', icon:'📯', color:'#3a2c5c', locked:true, pendingReward:true,
+    unlockedBy:'slayer_nullcaller_t3', desc:'A summoning chit that keeps calling down ember mites long after the caller that made it burned out. +6% flat chance to stun an enemy on hit (not luck-scaled). Bosses are immune.' },
+  hollowstalkerveil: { id:'hollowstalkerveil', name:'Hollow Stalker Veil', icon:'🌑', color:'#201e30', locked:true, pendingReward:true,
+    unlockedBy:'slayer_hollowstalker_t3', desc:'A veil cut from the dark a hollow stalker ambushes out of — attacks and shots recharge 8% faster.' },
+  eventsummonschit: { id:'eventsummonschit', name:'Event Summons Chit', icon:'📯', color:'#2c2050', locked:true, pendingReward:true,
+    unlockedBy:'slayer_eventcaller_t3', desc:'A summoning chit that keeps calling down collapse mites long after the caller that made it fell in. +6% flat chance to stun an enemy on hit (not luck-scaled). Bosses are immune.' },
+  silentstalkerveil: { id:'silentstalkerveil', name:'Silent Stalker Veil', icon:'🌑', color:'#0c0c14', locked:true, pendingReward:true,
+    unlockedBy:'slayer_silentstalker_t3', desc:'A veil cut from the dark a silent stalker ambushes out of — attacks and shots recharge 8% faster.' },
+  collapsedmoment: { id:'collapsedmoment', name:'Collapsed Moment', icon:'🌌', color:'#9ab8ff', locked:true, pendingReward:true,
+    unlockedBy:'challenge_voidbetween2_flawless', desc:'The exact instant The Singularity stopped pulling, held forever. +1 damage to all attacks.' },
+  emptyeventpurse: { id:'emptyeventpurse', name:'Empty Event Purse', icon:'👛', color:'#6a7290', locked:true, pendingReward:true,
+    unlockedBy:'challenge_voidbetween2_frugal', desc:'Not a single coin spent, all the way to the end of everything. -5% shop prices.' },
+
+  /* ---------------------------------------------------------------
+     Phase 8e (slice 2/4) — 25 new trinkets, each gated behind its own
+     new skill-tree "unlock" node (see achievements/skilltree-unlocks-
+     trinkets.js). `sk8t_` id prefix reserved for this slice specifically
+     to avoid any collision with the sibling stars/familiars/items
+     slices landing in parallel — see that file's header comment.
+     All `locked:true` (unlocked only via their skill-tree node, exactly
+     like the rest of this file's locked entries) and every one of them
+     is wired into an existing recalcPlayerStats/combat/familiar hook —
+     see items-1.js, combat-2.js, familiars.js. ---------------------- */
+  sk8t_ironclasp: { id:'sk8t_ironclasp', name:'Iron Clasp', icon:'⚙️', color:'#8a7a6a', locked:true,
+    desc:'+1 damage to all attacks, -10% movement speed.' },
+  sk8t_windveil: { id:'sk8t_windveil', name:'Wind Veil', icon:'🌬️', color:'#9ac9e0', locked:true,
+    desc:'+9% movement speed.' },
+  sk8t_leadenlocket: { id:'sk8t_leadenlocket', name:'Leaden Locket', icon:'⛓️', color:'#6a6a6a', locked:true,
+    desc:'+14% movement speed, -1 Luck.' },
+  sk8t_hairspring: { id:'sk8t_hairspring', name:'Hairspring', icon:'⏱️', color:'#c9a35a', locked:true,
+    desc:'Attacks and shots recharge 6% faster.' },
+  sk8t_boggedgear: { id:'sk8t_boggedgear', name:'Bogged Gear', icon:'⚙️', color:'#5a6a4a', locked:true,
+    desc:'Attacks and shots recharge 5% faster, -5% movement speed.' },
+  sk8t_farcastbead: { id:'sk8t_farcastbead', name:'Farcast Bead', icon:'🔭', color:'#8fd6c9', locked:true,
+    desc:'+1 tile of attack range.' },
+  sk8t_narrowscope: { id:'sk8t_narrowscope', name:'Narrow Scope', icon:'🔬', color:'#9ac9e0', locked:true,
+    desc:'+1 tile of attack range, -5% critical hit chance.' },
+  sk8t_glasscannon: { id:'sk8t_glasscannon', name:'Glass Cannon Shard', icon:'💎', color:'#e05a8a', locked:true,
+    desc:'+8% critical hit chance, -1 damage to all attacks.' },
+  sk8t_deadeyeclasp: { id:'sk8t_deadeyeclasp', name:'Deadeye Clasp', icon:'🎯', color:'#e0895a', locked:true,
+    desc:'+6% critical hit chance.' },
+  sk8t_ricochetcoil: { id:'sk8t_ricochetcoil', name:'Ricochet Coil', icon:'🌀', color:'#c9668a', locked:true,
+    desc:'Critical hits deal even more damage.' },
+  sk8t_fourleafpin: { id:'sk8t_fourleafpin', name:'Four-Leaf Pin', icon:'🍀', color:'#4caf50', locked:true,
+    desc:'+2 Luck.' },
+  sk8t_witchhazelcharm: { id:'sk8t_witchhazelcharm', name:'Witch Hazel Charm', icon:'🌿', color:'#5f8a3f', locked:true,
+    desc:'+1 Luck, -8% movement speed.' },
+  sk8t_eelskinwrap: { id:'sk8t_eelskinwrap', name:'Eelskin Wrap', icon:'🐍', color:'#3a8a8a', locked:true,
+    desc:'+5% chance to dodge incoming damage entirely.' },
+  sk8t_lodestonecharm: { id:'sk8t_lodestonecharm', name:'Lodestone Charm', icon:'🧲', color:'#8a6ec9', locked:true,
+    desc:'Pulls nearby pickups toward you from further away.' },
+  sk8t_cinderpouch: { id:'sk8t_cinderpouch', name:'Cinder Pouch', icon:'🧨', color:'#e07a3a', locked:true,
+    desc:'+12% bomb blast radius.' },
+  sk8t_awlspike: { id:'sk8t_awlspike', name:'Awl Spike', icon:'📌', color:'#9ac9e0', locked:true,
+    desc:'Ranged bolts pierce through one more enemy.' },
+  sk8t_twinnotch: { id:'sk8t_twinnotch', name:'Twin Notch', icon:'🏹', color:'#c9c9c9', locked:true,
+    desc:'Ranged attacks fire one extra bolt, -8% movement speed.' },
+  sk8t_hungryfangcharm: { id:'sk8t_hungryfangcharm', name:'Hungry Fang Charm', icon:'🦷', color:'#a33a3a', locked:true,
+    desc:'+5% chance any hit heals you half a heart.' },
+  sk8t_direstingpin: { id:'sk8t_direstingpin', name:'Dire Sting Pin', icon:'🐍', color:'#6fa83a', locked:true,
+    desc:'+4% flat chance to poison an enemy on hit (not luck-scaled). Bosses are immune.' },
+  sk8t_rimeclasp: { id:'sk8t_rimeclasp', name:'Rime Clasp', icon:'❄️', color:'#7fd6e0', locked:true,
+    desc:'+4% flat chance to freeze an enemy solid on hit (not luck-scaled). Bosses are immune.' },
+  sk8t_hagglerspurse: { id:'sk8t_hagglerspurse', name:"Haggler's Purse", icon:'👛', color:'#c9a35a', locked:true,
+    desc:'-8% shop prices.' },
+  sk8t_giltclasp: { id:'sk8t_giltclasp', name:'Gilt Clasp', icon:'🪙', color:'#e3c15b', locked:true,
+    desc:'+12% coin value.' },
+  sk8t_boneshakerpouch: { id:'sk8t_boneshakerpouch', name:'Boneshaker Pouch', icon:'🎒', color:'#7a2a2a', locked:true,
+    desc:'5% chance an enemy drops a bomb on death.' },
+  sk8t_stormcollar: { id:'sk8t_stormcollar', name:'Storm Collar', icon:'🪢', color:'#e8d16a', locked:true,
+    desc:'Your familiars strike and fire 12% more often.' },
+  sk8t_direkegcharm: { id:'sk8t_direkegcharm', name:'Dire Keg Charm', icon:'🛢️', color:'#e07a3a', locked:true,
+    desc:'Bomb pickups give one extra bomb.' },
 });
 const TRINKET_LIST = Object.values(TRINKETS);
