@@ -33,108 +33,28 @@
    ============================================================ */
 
 // ---- A. floorKey '14' regular enemies ----
-addTierSet({ baseId:'slayer_deadaircoda', name:'Dead Air Coda Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'deadaircoda',
-  desc: n => 'Defeat ' + n + ' of the DNB Dead Air Coda.',
-  tiers:[ { threshold:8, itemId:'hcfwtrophy_deadaircoda_t1' }, { threshold:30, itemId:'hcfwtrophy_deadaircoda_t2' }, { threshold:80, itemId:'hcfwtrophy_deadaircoda_t3' } ] });
 
-addTierSet({ baseId:'slayer_flatlineburrower', name:'Flatline Burrower Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'flatlineburrower',
-  desc: n => 'Defeat ' + n + ' of the DNB Flatline Burrower.',
-  tiers:[ { threshold:8, itemId:'hcfwtrophy_flatlineburrower_t1' }, { threshold:30, itemId:'hcfwtrophy_flatlineburrower_t2' }, { threshold:80, itemId:'hcfwtrophy_flatlineburrower_t3' } ] });
 
-addTierSet({ baseId:'slayer_silencestalker', name:'Silence Stalker Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'silencestalker',
-  desc: n => 'Defeat ' + n + ' of the DNB Silence Stalker.',
-  tiers:[ { threshold:8, itemId:'hcfwtrophy_silencestalker_t1' }, { threshold:30, itemId:'hcfwtrophy_silencestalker_t2' }, { threshold:80, itemId:'hcfwtrophy_silencestalker_t3' } ] });
 
-addTierSet({ baseId:'slayer_decrescendosplitter', name:'Decrescendo Splitter Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'decrescendosplitter',
-  desc: n => 'Defeat ' + n + ' of the DNB Decrescendo Splitter.',
-  tiers:[ { threshold:8, itemId:'hcfwtrophy_decrescendosplitter_t1' }, { threshold:30, itemId:'hcfwtrophy_decrescendosplitter_t2' }, { threshold:80, trinketId:'splitscarcasing' } ] });
 
 // ---- B. the 4 new floorKey '13'/'14' bosses ----
-addTierSet({ baseId:'slayer_lastovertone', name:'The Last Overtone Hunter', icon:'👑',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'lastovertone',
-  desc: n => 'Defeat ' + n + ' of The Last Overtone.',
-  tiers:[ { threshold:3, itemId:'hcfwtrophy_lastovertone_t1' }, { threshold:10, itemId:'hcfwtrophy_lastovertone_t2' }, { threshold:25, itemId:'lastchord' } ] });
 
-addTierSet({ baseId:'slayer_hollowcantor', name:'The Hollow Cantor Hunter', icon:'👑',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hollowcantor',
-  desc: n => 'Defeat ' + n + ' of The Hollow Cantor.',
-  tiers:[ { threshold:3, itemId:'hcfwtrophy_hollowcantor_t1' }, { threshold:10, itemId:'hcfwtrophy_hollowcantor_t2' }, { threshold:25, trinketId:'cantorbell' } ] });
 
-addTierSet({ baseId:'slayer_flatlinewraith', name:'The Flatline Wraith Hunter', icon:'👑',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'flatlinewraith',
-  desc: n => 'Defeat ' + n + ' of The Flatline Wraith.',
-  tiers:[ { threshold:3, itemId:'hcfwtrophy_flatlinewraith_t1' }, { threshold:10, itemId:'hcfwtrophy_flatlinewraith_t2' }, { threshold:25, familiarId:'wraithnote' } ] });
 
-addTierSet({ baseId:'slayer_zeroamplitude', name:'The Zero Amplitude Hunter', icon:'👑',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'zeroamplitude',
-  desc: n => 'Defeat ' + n + ' of The Zero Amplitude.',
-  tiers:[ { threshold:3, itemId:'hcfwtrophy_zeroamplitude_t1' }, { threshold:10, itemId:'hcfwtrophy_zeroamplitude_t2' }, { threshold:25, itemId:'zeroline' } ] });
 
 // ---- C. floorKey '13' roster extension — SECOND ladder, fresh ids, picking up
 //    past the pre-existing achievement's own threshold(s) on the same bestiaryId ----
-addTierSet({ baseId:'slayer2_onbeatstalker', name:'Onbeat Stalker Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'onbeatstalker',
-  desc: n => 'Defeat ' + n + ' of the DNB Onbeat Stalker.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_onbeatstalker_t1' }, { threshold:150, itemId:'hcfwtrophy_r_onbeatstalker_t2' }, { threshold:300, itemId:'hcfwtrophy_r_onbeatstalker_t3' } ] });
 
-addTierSet({ baseId:'slayer2_downbeatbrute', name:'Downbeat Brute Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'downbeatbrute',
-  desc: n => 'Defeat ' + n + ' of the DNB Downbeat Brute.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_downbeatbrute_t1' }, { threshold:150, itemId:'hcfwtrophy_r_downbeatbrute_t2' }, { threshold:300, itemId:'hcfwtrophy_r_downbeatbrute_t3' } ] });
 
-addTierSet({ baseId:'slayer2_crescendocharger', name:'Crescendo Charger Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'crescendocharger',
-  desc: n => 'Defeat ' + n + ' of the DNB Crescendo Charger.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_crescendocharger_t1' }, { threshold:150, itemId:'hcfwtrophy_r_crescendocharger_t2' }, { threshold:300, itemId:'hcfwtrophy_r_crescendocharger_t3' } ] });
 
-addTierSet({ baseId:'slayer2_apexmarksman', name:'Apex Marksman Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'apexmarksman',
-  desc: n => 'Defeat ' + n + ' of the DNB Apex Marksman.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_apexmarksman_t1' }, { threshold:150, itemId:'hcfwtrophy_r_apexmarksman_t2' }, { threshold:300, itemId:'hcfwtrophy_r_apexmarksman_t3' } ] });
 
-addTierSet({ baseId:'slayer2_codablinker', name:'Coda Blinker Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'codablinker',
-  desc: n => 'Defeat ' + n + ' of the DNB Coda Blinker.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_codablinker_t1' }, { threshold:150, itemId:'hcfwtrophy_r_codablinker_t2' }, { threshold:300, itemId:'hcfwtrophy_r_codablinker_t3' } ] });
 
-addTierSet({ baseId:'slayer2_resonancewarden', name:'Resonance Warden Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'resonancewarden',
-  desc: n => 'Defeat ' + n + ' of the DNB Resonance Warden.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_resonancewarden_t1' }, { threshold:150, itemId:'hcfwtrophy_r_resonancewarden_t2' }, { threshold:300, itemId:'hcfwtrophy_r_resonancewarden_t3' } ] });
 
-addTierSet({ baseId:'slayer2_finalemortar', name:'Finale Mortar Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'finalemortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Finale Mortar.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_finalemortar_t1' }, { threshold:150, itemId:'hcfwtrophy_r_finalemortar_t2' }, { threshold:300, itemId:'hcfwtrophy_r_finalemortar_t3' } ] });
 
-addTierSet({ baseId:'slayer2_goldenmites', name:'Golden Mites Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'goldenmites',
-  desc: n => 'Defeat ' + n + ' of the DNB Golden Mites.',
-  tiers:[ { threshold:60, itemId:'hcfwtrophy_r_goldenmites_t1' }, { threshold:150, itemId:'hcfwtrophy_r_goldenmites_t2' }, { threshold:300, itemId:'hcfwtrophy_r_goldenmites_t3' } ] });
 
-addTierSet({ baseId:'slayer2_polyrhythm', name:'Polyrhythm Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'polyrhythm',
-  desc: n => 'Defeat ' + n + ' of the DNB Polyrhythm.',
-  tiers:[ { threshold:100, itemId:'hcfwtrophy_r_polyrhythm_t1' }, { threshold:250, itemId:'hcfwtrophy_r_polyrhythm_t2' }, { threshold:500, itemId:'hcfwtrophy_r_polyrhythm_t3' } ] });
 
-addTierSet({ baseId:'slayer2_fermatasentry', name:'Fermata Sentry Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'fermatasentry',
-  desc: n => 'Defeat ' + n + ' of the DNB Fermata Sentry.',
-  tiers:[ { threshold:100, itemId:'hcfwtrophy_r_fermatasentry_t1' }, { threshold:250, itemId:'hcfwtrophy_r_fermatasentry_t2' }, { threshold:500, itemId:'hcfwtrophy_r_fermatasentry_t3' } ] });
 
-addTierSet({ baseId:'slayer2_syncopehopper', name:'Syncope Hopper Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'syncopehopper',
-  desc: n => 'Defeat ' + n + ' of the DNB Syncope Hopper.',
-  tiers:[ { threshold:100, itemId:'hcfwtrophy_r_syncopehopper_t1' }, { threshold:250, itemId:'hcfwtrophy_r_syncopehopper_t2' }, { threshold:500, itemId:'hcfwtrophy_r_syncopehopper_t3' } ] });
 
-addTierSet({ baseId:'slayer2_tremorswarm', name:'Tremor Swarm Veteran Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'tremorswarm',
-  desc: n => 'Defeat ' + n + ' of the DNB Tremor Swarm.',
-  tiers:[ { threshold:100, itemId:'hcfwtrophy_r_tremorswarm_t1' }, { threshold:250, itemId:'hcfwtrophy_r_tremorswarm_t2' }, { threshold:500, itemId:'hcfwtrophy_r_tremorswarm_t3' } ] });
 
 
 /* ============================================================

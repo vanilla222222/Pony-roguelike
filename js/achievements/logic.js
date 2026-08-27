@@ -38,6 +38,13 @@ function ensureUnlockShape(unlocks){
   // it's touched and nothing ever reads `undefined[id]`.
   if (!unlocks.unlockedPillColors) unlocks.unlockedPillColors = {};
   if (!unlocks.unlockedEnemies) unlocks.unlockedEnemies = {};
+  // Phase 10 — the two alternate routes are now EARNED rather than always
+  // offered: { C:bool, D:bool }, read by core.js's isPathUnlocked and granted
+  // by game.js's descend (clear the old main route -> C; clear the C route ->
+  // D). Same "create it if the save predates it" treatment as everything
+  // above, so an old save simply starts with both false — see the audit note:
+  // players who had already used C/D must clear the main route once more.
+  if (!unlocks.unlockedPaths) unlocks.unlockedPaths = { C:false, D:false };
   if (!unlocks.winsByClass) unlocks.winsByClass = {};
   // donation machine (see shop.js) — which of the 10 per-kind -1c discounts
   // have been earned; the lifetime coins-donated count itself lives in
@@ -64,6 +71,41 @@ function ensureUnlockShape(unlocks){
   if (!b.seenPickupKinds) b.seenPickupKinds = {}; // { pickupKind: true } — see combat.js grantPickupEffect
   if (!b.seenRoomTypes) b.seenRoomTypes = {}; // { roomType: true } — set on first entry, see game.js enterRoom
   if (!b.seenStages) b.seenStages = {}; // { stageId: true } — set on floor start (main path only), see game.js startFloor
+  // Phase 8a — bestiary tiers. The eight buckets above are boolean "ever seen"
+  // sets, which can't feed a repeat-count ladder, so each gains a parallel
+  // COUNT bucket bumped from the same markBestiarySeen call. The boolean set
+  // stays authoritative for "discovered" (panel rows, breadth achievements);
+  // these are purely the tier ladders' input. objectsSeen deliberately gets no
+  // counter — objectsDestroyed already covers the tiered case for objects.
+  if (!b.itemsCollectedCount) b.itemsCollectedCount = {};           // { itemId: count } — mirrors seenItems
+  if (!b.trinketsEquippedCount) b.trinketsEquippedCount = {};       // { trinketId: count } — mirrors seenTrinkets
+  if (!b.familiarsCollectedCount) b.familiarsCollectedCount = {};   // { familiarId: count } — mirrors seenFamiliars
+  if (!b.starsUsedCount) b.starsUsedCount = {};                     // { starId: count } — mirrors seenStars
+  if (!b.pillsDrunkCount) b.pillsDrunkCount = {};                   // { colorId: count } — mirrors seenPills
+  if (!b.pickupKindsCollectedCount) b.pickupKindsCollectedCount = {}; // { pickupKind: count } — mirrors seenPickupKinds
+  if (!b.roomTypesVisitedCount) b.roomTypesVisitedCount = {};       // { roomType: count } — mirrors seenRoomTypes
+  if (!b.stagesVisitedCount) b.stagesVisitedCount = {};             // { stageId: count } — mirrors seenStages
+  // { 'category/id': highestTierPaidOut 0-4 } — the ledger that keeps a tier
+  // from paying its skill point twice. See checkBestiaryTierUp below.
+  if (!b.tiersAwarded) b.tiersAwarded = {};
+  // Phase 8a — the skill-point wallet the tiers feed. Nothing spends it yet;
+  // the skill tree panel itself is a later phase. `spent`/`unlockedNodes` are
+  // reserved now so the save shape doesn't need another migration later.
+  if (!unlocks.skillTree) unlocks.skillTree = { points: 0, spent: {}, unlockedNodes: {} };
+  if (unlocks.skillTree.points == null) unlocks.skillTree.points = 0;
+  if (!unlocks.skillTree.spent) unlocks.skillTree.spent = {};
+  if (!unlocks.skillTree.unlockedNodes) unlocks.skillTree.unlockedNodes = {};
+  // Lifetime total ever earned (never decremented by spending OR by
+  // sellSkillNode's refund — a refund gives `points` back, not a fresh
+  // earn) — purely a "how far have I come" stat surfaced in the skill tree
+  // panel's summary line. Older saves get it backfilled once, seeded from
+  // `points + sum(spent)` so it isn't just 0 for anyone who already had a
+  // wallet before this counter existed.
+  if (unlocks.skillTree.lifetimeEarned == null) {
+    let spentTotal = 0;
+    for (const k in unlocks.skillTree.spent) spentTotal += unlocks.skillTree.spent[k] || 0;
+    unlocks.skillTree.lifetimeEarned = unlocks.skillTree.points + spentTotal;
+  }
   // merge onto any existing stats blob so older saves pick up new counters
   // without losing progress on the ones they already had
   const statDefaults = {
@@ -72,6 +114,11 @@ function ensureUnlockShape(unlocks){
     obstaclesDestroyed:0, bombsPlaced:0, shotsFired:0, critsLanded:0, itemsCollected:0,
     trinketsEquipped:0, familiarsCollected:0, deaths:0, wins:0, roomsCleared:0,
     shopPurchases:0, activeItemUses:0, meleeKills:0, rangedKills:0, donationTotal:0, pillsUsed:0, keysUsed:0, starsUsed:0,
+    // how many of the every-25c-donated skill points have already been paid
+    // out — see awardDonationSkillPoints below. Kept as its own counter
+    // (rather than re-deriving from donationTotal each time) so a future
+    // change to the interval can't silently re-pay or skip old progress.
+    donationSkillPointsAwarded:0,
     // new-room-type / new-obstacle counters (see game.js's enterRoom, combat.js's
     // triggerSacrificeSpike/tryUnlockKeyDoor/checkRoomCleared/handleEnemyDeath/
     // explodeAt/damageObstacleHit) — thresholds for the 20 achievements below
@@ -183,13 +230,20 @@ function unlockAchievement(achId, game){
     rewardEnemy = ENEMY_TYPES[def.enemyId];
   } else if (def.shopDiscount) {
     unlocks.donationDiscounts[def.shopDiscount] = true;
+  } else if (def.skillPoints) {
+    // flat skill-point bonus — used by the four donation milestones past
+    // 1000c (2000/3000/4000/5000), once every -1c shop discount is already
+    // spoken for. Separate from (and on top of) the every-25c drip in
+    // awardDonationSkillPoints below.
+    unlocks.skillTree.points += def.skillPoints;
+    unlocks.skillTree.lifetimeEarned = (unlocks.skillTree.lifetimeEarned || 0) + def.skillPoints;
   }
   saveUnlocks(unlocks);
 
   if (def.classId) {
     const cls = CLASSES[def.classId];
     Sound.play('unlock');
-    toast('New class unlocked: ' + (cls ? cls.name : def.classId) + '!');
+    toast('New class unlocked: ' + (cls ? cls.name : def.classId) + '!', false, 'good');
   } else {
     Sound.play('achievement');
     // the reward's own icon reads faster than its name alone at a glance —
@@ -198,7 +252,7 @@ function unlockAchievement(achId, game){
     // swatch and a sprite, not an inventory entry), so they get a fixed
     // stand-in glyph rather than an empty slot in the toast.
     const rewardIcon = rewardItem ? rewardItem.icon : rewardTrinket ? rewardTrinket.icon : rewardFamiliar ? rewardFamiliar.icon : rewardStar ? rewardStar.icon
-      : rewardPillColor ? '💊' : rewardEnemy ? '👾' : '';
+      : rewardPillColor ? '💊' : rewardEnemy ? '👾' : def.skillPoints ? '💠' : '';
     const rewardLabel = rewardItem ? ('"' + rewardItem.name + '"')
       : rewardTrinket ? ('trinket "' + rewardTrinket.name + '"')
       : rewardFamiliar ? ('familiar "' + rewardFamiliar.name + '"')
@@ -206,8 +260,9 @@ function unlockAchievement(achId, game){
       : rewardPillColor ? ('pill color "' + rewardPillColor.name + '"')
       : rewardEnemy ? ('enemy "' + rewardEnemy.name + '"')
       : def.pickupKind ? PICKUP_KIND_LABELS[def.pickupKind]
-      : def.shopDiscount ? (SHOP_KIND_LABELS[def.shopDiscount] + ' price -1c, permanently') : null;
-    toast('🏆 Achievement: ' + def.name + (rewardLabel ? ' — unlocked ' + (rewardIcon ? rewardIcon + ' ' : '') + rewardLabel : ''), true);
+      : def.shopDiscount ? (SHOP_KIND_LABELS[def.shopDiscount] + ' price -1c, permanently')
+      : def.skillPoints ? (def.skillPoints + ' skill point' + (def.skillPoints === 1 ? '' : 's')) : null;
+    toast('🏆 Achievement: ' + def.name + (rewardLabel ? ' — unlocked ' + (rewardIcon ? rewardIcon + ' ' : '') + rewardLabel : ''), true, 'good');
   }
 
   // NOTE: the reward is deliberately NOT handed to the player in the current
@@ -227,6 +282,20 @@ function unlockAchievement(achId, game){
 }
 
 // lifetime counters for the threshold-based misc achievements
+// Phase 10 — grant an alternate route (see core.js's isPathUnlocked).
+// Idempotent and safe to call every time the condition holds. Writes straight
+// to the live save and deliberately does NOT touch the run snapshot, so the
+// newly opened path first appears on the player's NEXT run, matching how
+// every other mid-run unlock behaves (see beginRunUnlocks/endRunUnlocks).
+// `game` is optional and only used for the toast.
+function unlockPath(path, game){
+  const unlocks = ensureUnlockShape(loadUnlocks());
+  if (unlocks.unlockedPaths[path]) return; // already earned
+  unlocks.unlockedPaths[path] = true;
+  saveUnlocks(unlocks);
+  if (game && game.toast) game.toast('🗝️ A new path has opened — look for its gate on your next run!');
+}
+
 function bumpStat(key, amount, game){
   const unlocks = ensureUnlockShape(loadUnlocks());
   unlocks.stats[key] = (unlocks.stats[key] || 0) + amount;
@@ -237,6 +306,28 @@ function bumpStat(key, amount, game){
   if (watchers) for (const a of watchers) {
     if (unlocks.stats[key] >= a.threshold) unlockAchievement(a.id, game);
   }
+}
+
+// Every 25c ever donated (see shop.js's DONATION_SKILL_POINT_INTERVAL) pays
+// 1 skill point, independent of and on top of the "Donations" achievement
+// ladder above. Idempotent: derives how many intervals SHOULD have been paid
+// from the current donationTotal and only pays the difference, tracked in
+// unlocks.stats.donationSkillPointsAwarded so a re-entrant call (or a save
+// re-load) can never double-pay. Called from shop.js's tryDonateMachine
+// right after bumpStat('donationTotal', ...). `game` is optional, used only
+// for the toast.
+function awardDonationSkillPoints(game){
+  const unlocks = ensureUnlockShape(loadUnlocks());
+  const eligible = Math.floor((unlocks.stats.donationTotal || 0) / DONATION_SKILL_POINT_INTERVAL);
+  const already = unlocks.stats.donationSkillPointsAwarded || 0;
+  const gained = eligible - already;
+  if (gained <= 0) return;
+  unlocks.stats.donationSkillPointsAwarded = eligible;
+  unlocks.skillTree.points += gained;
+  unlocks.skillTree.lifetimeEarned = (unlocks.skillTree.lifetimeEarned || 0) + gained;
+  saveUnlocks(unlocks);
+  Sound.play('skillPointGain');
+  if (game && game.toast) game.toast('💠 +' + gained + ' skill point' + (gained === 1 ? '' : 's') + ' from donating!');
 }
 
 // "best of" lifetime records — unlike bumpStat, these only ever move in one
@@ -263,27 +354,87 @@ function setStatMin(key, value){
 // time — combat.js's handleEnemyDeath uses this to fire a one-off "New
 // Bestiary entry" toast on an enemy's first kill, without re-toasting on
 // every kill after
+/* Phase 8a — bestiary tiers.
+
+   Every per-id count feeds a 4-rung ladder (see achievements/bestiary-tiers.js).
+   The moment a count crosses a rung it pays 1 skill point per rung crossed into
+   unlocks.skillTree.points, recorded in unlocks.bestiary.tiersAwarded so the
+   same rung can never pay twice. Nothing spends those points yet — the skill
+   tree panel is a later phase.
+
+   Which boolean-seen sections get a parallel count bucket + a tier category.
+   Sections absent from this table (objectsSeen — no natural repeat-count
+   meaning) stay plain booleans and earn no tier. enemyDeaths likewise has no
+   entry in the count-section table below: it measures how often something
+   killed YOU, which is not player progress. */
+const _BESTIARY_SEEN_TIER_MAP = {
+  seenItems:       { category:'item',     countBucket:'itemsCollectedCount' },
+  seenTrinkets:    { category:'trinket',  countBucket:'trinketsEquippedCount' },
+  seenFamiliars:   { category:'familiar', countBucket:'familiarsCollectedCount' },
+  seenStars:       { category:'star',     countBucket:'starsUsedCount' },
+  seenPills:       { category:'pill',     countBucket:'pillsDrunkCount' },
+  seenPickupKinds: { category:'pickup',   countBucket:'pickupKindsCollectedCount' },
+  seenRoomTypes:   { category:'roomtype', countBucket:'roomTypesVisitedCount' },
+  seenStages:      { category:'stage',    countBucket:'stagesVisitedCount' },
+};
+
+// enemyKills is one bucket holding three tier categories — which one an id
+// belongs to is decided by the data table it was declared in.
+function bestiaryTierCategoryForEnemy(id){
+  if (typeof SUPERBOSSES !== 'undefined' && SUPERBOSSES[id]) return 'superboss';
+  if (typeof BOSS_TYPES !== 'undefined' && BOSS_TYPES[id]) return 'boss';
+  return 'enemy';
+}
+
+// Mutates `unlocks` only — the caller is responsible for the single
+// saveUnlocks() that persists it. Returns the newly reached tier (1-4), or 0
+// if this call didn't cross a rung. A jump that clears several rungs at once
+// (e.g. a save imported past a threshold) pays for all of them.
+function checkBestiaryTierUp(unlocks, category, id, count){
+  const key = category + '/' + id;
+  const prevTier = unlocks.bestiary.tiersAwarded[key] || 0;
+  const newTier = bestiaryTierFor(category, count);
+  if (newTier > prevTier) {
+    unlocks.bestiary.tiersAwarded[key] = newTier;
+    const gained = newTier - prevTier;
+    unlocks.skillTree.points += gained;
+    unlocks.skillTree.lifetimeEarned = (unlocks.skillTree.lifetimeEarned || 0) + gained;
+    return newTier;
+  }
+  return 0;
+}
+
 function bumpBestiaryCount(section, id, amount, game){
   if (!id) return false;
   const unlocks = ensureUnlockShape(loadUnlocks());
   const bucket = unlocks.bestiary[section];
   const wasNew = !bucket[id];
   bucket[id] = (bucket[id] || 0) + amount;
+  // tier pass BEFORE the single save below, so points ride along with it
+  if (section === 'enemyKills') checkBestiaryTierUp(unlocks, bestiaryTierCategoryForEnemy(id), id, bucket[id]);
+  else if (section === 'objectsDestroyed') checkBestiaryTierUp(unlocks, 'object', id, bucket[id]);
   saveUnlocks(unlocks);
   checkBestiaryAchievements(section, id, bucket, game, true);
   return wasNew;
 }
-// idempotent — cheap to call on every pickup/encounter, not just the first
+// idempotent for the seen-flag itself — cheap to call on every pickup/
+// encounter, not just the first. The parallel count bucket (Phase 8a) DOES
+// move on every call, since that's what the tier ladder thresholds against.
 function markBestiarySeen(section, id, game){
   if (!id) return;
   const unlocks = ensureUnlockShape(loadUnlocks());
   const bucket = unlocks.bestiary[section];
-  if (!bucket[id]) {
-    bucket[id] = true;
-    saveUnlocks(unlocks);
-    // only the first time: nothing else can move a section's distinct count
-    checkBestiaryAchievements(section, id, bucket, game, false);
+  const wasNew = !bucket[id];
+  if (wasNew) bucket[id] = true;
+  const tierInfo = _BESTIARY_SEEN_TIER_MAP[section];
+  if (tierInfo) {
+    const counts = unlocks.bestiary[tierInfo.countBucket];
+    counts[id] = (counts[id] || 0) + 1;
+    checkBestiaryTierUp(unlocks, tierInfo.category, id, counts[id]);
   }
+  if (wasNew || tierInfo) saveUnlocks(unlocks); // exactly one save per call
+  // only the first time: nothing else can move a section's distinct count
+  if (wasNew) checkBestiaryAchievements(section, id, bucket, game, false);
 }
 
 // main.js's module-level `game`, for the bestiary call sites that don't thread
@@ -345,14 +496,18 @@ function recordWin(game, classId){
    appends any unlisted category it finds in the index after these.)
 
    Characters/Superbosses/Completionist/Donations/Miscellaneous are the
-   original five; Slayer/Mastery/Exploration/Collection/Challenge are
-   reserved for the achievement expansion and are empty until then —
-   an empty category renders nothing, since the panel skips any section
-   with no rows to show.
+   original five; Exploration/Collection/Challenge are reserved for the
+   achievement expansion and are empty until then — an empty category
+   renders nothing, since the panel skips any section with no rows to show.
+
+   'Slayer' was removed entirely (its trophy-only rewards deleted, every
+   real reward migrated 1:1 into 'Mastery' — see defs-mastery.js and
+   feature-research/phase9-megaupdates/audit-remove-slayer.md); 'Mastery'
+   is no longer reserved-and-empty, it now holds those migrated entries.
    --------------------------------------------------------------- */
 const ACHIEVEMENT_CATEGORY_ORDER = [
   'Characters', 'Superbosses', 'Completionist',
-  'Slayer', 'Mastery', 'Exploration', 'Collection', 'Challenge',
+  'Mastery', 'Exploration', 'Collection', 'Challenge',
   'Donations', 'Miscellaneous',
 ];
 
@@ -434,7 +589,7 @@ function buildAchievementsPanel(){
         desc.textContent = Util.formatNum(distinctSeen(a.bestiarySection)) + ' / ' + Util.formatNum(a.distinctThreshold);
       } else desc.textContent = 'Not yet earned.';
       text.appendChild(desc);
-      if (a.classId || a.itemId || a.pickupKind || a.trinketId || a.familiarId || a.starId || a.shopDiscount) {
+      if (a.classId || a.itemId || a.pickupKind || a.trinketId || a.familiarId || a.starId || a.shopDiscount || a.skillPoints) {
         const rew = document.createElement('div');
         rew.className = 'achv-reward';
         if (a.classId) {
@@ -454,6 +609,8 @@ function buildAchievementsPanel(){
           rew.textContent = done ? ('Reward: ' + star.icon + ' ' + star.name + ' (star)') : 'Reward: a star';
         } else if (a.shopDiscount) {
           rew.textContent = done ? ('Reward: ' + SHOP_KIND_LABELS[a.shopDiscount] + ' price -1c') : 'Reward: a permanent shop discount';
+        } else if (a.skillPoints) {
+          rew.textContent = 'Reward: 💠 ' + a.skillPoints + ' skill point' + (a.skillPoints === 1 ? '' : 's');
         } else {
           rew.textContent = done ? ('Reward: ' + PICKUP_KIND_LABELS[a.pickupKind] + ' pickups') : 'Reward: a special pickup';
         }

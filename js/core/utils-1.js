@@ -19,6 +19,29 @@ const Util = {
   chance(p){ return Math.random() < p; },
   clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); },
   lerp(a, b, t){ return a + (b - a) * t; },
+  // Engine expansion pass — easing curves for anything that wants a
+  // non-linear lerp (UI transitions, future FX) without hand-writing the
+  // curve inline every time. `t` is 0..1 in, 0..1 out for all three.
+  easeOutCubic(t){ const p = 1 - Util.clamp(t, 0, 1); return 1 - p * p * p; },
+  easeInOutQuad(t){ t = Util.clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; },
+  easeOutElastic(t){
+    t = Util.clamp(t, 0, 1);
+    if (t === 0 || t === 1) return t;
+    const c4 = (2 * Math.PI) / 3;
+    return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+  // Signed-number formatting — several call sites across achievements/
+  // skilltree.js hand-roll `(v >= 0 ? '+' : '') + v` inline; these two give
+  // future code a one-call version rather than re-deriving the sign logic
+  // (existing call sites are left as-is, not refactored, to avoid touching
+  // already-verified display code).
+  formatSigned(n, decimals = 0){
+    const r = Number(n.toFixed(decimals));
+    return (r >= 0 ? '+' : '') + r;
+  },
+  formatSignedPercent(frac, decimals = 1){
+    return Util.formatSigned(frac * 100, decimals) + '%';
+  },
   dist(ax, ay, bx, by){ return Math.hypot(ax - bx, ay - by); },
   dist2(ax, ay, bx, by){ const dx = ax-bx, dy = ay-by; return dx*dx+dy*dy; },
   angleTo(ax, ay, bx, by){ return Math.atan2(by - ay, bx - ax); },
@@ -86,6 +109,14 @@ const Util = {
       ctx.clip();
       ctx.fillStyle = fillColor;
       ctx.fill(path);
+      // Phase 12 visual pass — a small glossy highlight in the upper-left
+      // lobe, same idea as the sheen every other filled shape in this game
+      // gets (projectile glint, coin glint, boss bar). Low, fixed opacity
+      // white so it reads as a highlight on ANY fillColor this function is
+      // ever called with (10+ call sites — pickup icons, HUD hearts, chest
+      // rewards, machine signage) rather than needing per-caller tuning.
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.beginPath(); ctx.ellipse(4.4, 4.2, 1.5, 0.9, -0.6, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     ctx.restore();
@@ -292,9 +323,11 @@ const Util = {
       ctx.beginPath(); ctx.ellipse(ob.x + 9, ob.y + 2, 4, 8, -0.3, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = flash ? HIT : ob.def.dark; ctx.lineWidth = 1;
       for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(ob.x + i * 4, ob.y - 10); ctx.lineTo(ob.x + i * 4, ob.y - 6); ctx.stroke(); }
-    // all four flames share one shape and read purely off def.color/def.dark;
-    // blue/purple have no maxHp, so `frac` below just pins to 1 for them
-    } else if (ob.kind === 'yellowfire' || ob.kind === 'redfire' || ob.kind === 'bluefire' || ob.kind === 'purplefire') {
+    // all seven flames share one shape and read purely off def.color/def.dark;
+    // blue/purple/white/black have no maxHp, so `frac` below just pins to 1
+    // for them (Phase 15 added green/white/black onto the original four)
+    } else if (ob.kind === 'yellowfire' || ob.kind === 'redfire' || ob.kind === 'bluefire' || ob.kind === 'purplefire'
+        || ob.kind === 'greenfire' || ob.kind === 'whitefire' || ob.kind === 'blackfire') {
       const frac = ob.def.maxHp ? Util.clamp(ob.hp / ob.def.maxHp, 0.25, 1) : 1;
       const flick = Math.sin((now || 0) / 70 + ob.x) * 3;
       ctx.fillStyle = Theme.shadow.groundSoft;
@@ -381,6 +414,11 @@ const Util = {
       ctx.fillStyle = Theme.shadow.groundSoft;
       ctx.beginPath(); ctx.ellipse(ob.x, ob.y + 9, 11, 4, 0, 0, Math.PI * 2); ctx.fill();
       const facets = [{ dx:0, dy:-2, s:1 }, { dx:-6, dy:3, s:0.7 }, { dx:6, dy:3, s:0.75 }];
+      // Phase 12 visual pass (canvas batch) — a soft ambient glow behind the
+      // whole cluster, same "this is special" tell every gem/star pickup
+      // in the game gets (drawStarIcon, quality glow rings) that this one
+      // was missing despite being a literal crystal.
+      if (!flash) { ctx.save(); ctx.shadowColor = ob.def.color; ctx.shadowBlur = 8; }
       for (const f of facets) {
         const fx = ob.x + f.dx, fy = ob.y + f.dy, r = 11 * f.s;
         ctx.fillStyle = flash ? HIT : ob.def.dark;
@@ -391,14 +429,36 @@ const Util = {
         ctx.beginPath();
         ctx.moveTo(fx, fy - r * 0.7); ctx.lineTo(fx + r * 0.4, fy); ctx.lineTo(fx, fy + r * 0.5); ctx.lineTo(fx - r * 0.4, fy);
         ctx.closePath(); ctx.fill();
+        // a tiny bright glint at each facet's tip, echoing the coin/key
+        // metal-glint convention used everywhere else in this file
+        if (!flash) {
+          ctx.fillStyle = Theme.shadow.glint;
+          ctx.beginPath(); ctx.arc(fx, fy - r * 0.55, 1, 0, Math.PI * 2); ctx.fill();
+        }
       }
+      if (!flash) ctx.restore();
     } else if (ob.kind === 'mud') {
-      ctx.fillStyle = flash ? HIT : ob.def.color;
+      // a radial gradient (darker toward the middle) instead of a flat
+      // fill — reads as a puddle with actual depth rather than a color chip
+      if (!flash) {
+        const g = ctx.createRadialGradient(ob.x, ob.y, 1, ob.x, ob.y, 14);
+        g.addColorStop(0, Util.shadeColor(ob.def.color, -0.15));
+        g.addColorStop(1, Util.shadeColor(ob.def.color, 0.1));
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = HIT;
+      }
       ctx.beginPath(); ctx.ellipse(ob.x, ob.y, 14, 10, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = flash ? HIT_SOFT : ob.def.dark;
       ctx.beginPath(); ctx.ellipse(ob.x - 4, ob.y - 2, 3, 2, 0.4, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(ob.x + 5, ob.y + 2, 4, 2.5, -0.3, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(ob.x, ob.y + 4, 2.5, 1.5, 0.2, 0, Math.PI * 2); ctx.fill();
+      // a small sky-reflection glint — a puddle catches light, a flat brown
+      // ellipse doesn't
+      if (!flash) {
+        ctx.fillStyle = 'rgba(255,255,255,.18)';
+        ctx.beginPath(); ctx.ellipse(ob.x - 6, ob.y - 5, 3, 1.2, -0.4, 0, Math.PI * 2); ctx.fill();
+      }
     } else if (ob.kind === 'sandtrap') {
       ctx.fillStyle = flash ? HIT : ob.def.color;
       ctx.beginPath(); ctx.ellipse(ob.x, ob.y, 14, 10, 0, 0, Math.PI * 2); ctx.fill();
@@ -472,17 +532,32 @@ const Util = {
     ctx.moveTo(x + 5, y); ctx.lineTo(x + 5, y + 4);
     ctx.moveTo(x + 8, y); ctx.lineTo(x + 8, y + 4);
     ctx.stroke();
+    // Phase 12 visual pass (canvas batch) — a small bright glint on the
+    // bow, same "reads as polished metal" tell every other metal pickup
+    // (coins, goldkey/goldbomb glow) already gets.
+    ctx.fillStyle = Theme.shadow.glint;
+    ctx.beginPath(); ctx.arc(x - 5.5, y - 1.5, 1.1, 0, Math.PI * 2); ctx.fill();
   },
 
   drawBombIcon(ctx, x, y, bodyColor, fuseColor){
-    ctx.fillStyle = bodyColor;
+    // was a flat fillStyle — every other bomb-shaped body in this game
+    // (world bombs, bomb barrels) already uses the lit-sphere gradient.
+    ctx.fillStyle = Util.bodyShade(ctx, x, y + 2, 8, bodyColor);
     ctx.beginPath(); ctx.arc(x, y + 2, 8, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = fuseColor; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x + 3, y - 6); ctx.lineTo(x + 7, y - 11); ctx.stroke();
   },
 
-  drawSackIcon(ctx, x, y){
-    ctx.fillStyle = Theme.icon.sack;
+  // Phase 16 — bodyColor/seamColor are optional (default the plain tan
+  // Sack), so the Trash Bag pickup (data/collectibles.js's 'trashbag')
+  // can reuse this exact shape/gradient/seam-stroke treatment tinted green
+  // (Theme.icon.trashBag/trashBagSeam) instead of needing its own draw
+  // function — same silhouette, different material, like a lot of this
+  // game's recolored fixtures already do.
+  drawSackIcon(ctx, x, y, bodyColor, seamColor){
+    // was a flat fillStyle — same lit-sphere gradient treatment as every
+    // other round pickup body in this game.
+    ctx.fillStyle = Util.bodyShade(ctx, x, y, 10, bodyColor || Theme.icon.sack);
     ctx.beginPath();
     ctx.moveTo(x - 8, y - 2);
     ctx.quadraticCurveTo(x - 10, y + 10, x, y + 11);
@@ -490,7 +565,7 @@ const Util = {
     ctx.quadraticCurveTo(x + 6, y - 8, x, y - 8);
     ctx.quadraticCurveTo(x - 6, y - 8, x - 8, y - 2);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = Theme.icon.sackSeam; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = seamColor || Theme.icon.sackSeam; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.strokeStyle = Theme.icon.sackTie; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x - 5, y - 8); ctx.lineTo(x + 5, y - 8); ctx.stroke();
   },
@@ -499,8 +574,13 @@ const Util = {
     const w = 12, h = 18 * frac;
     ctx.fillStyle = Theme.icon.batteryShell;
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
+    // a small glow behind the charge cell — reads as "powered" rather than
+    // a flat teal rectangle, echoing the goldGlow treatment gold pickups get
+    ctx.save();
+    ctx.shadowColor = Theme.icon.batteryCharge; ctx.shadowBlur = 4;
     ctx.fillStyle = Theme.icon.batteryCharge;
     ctx.fillRect(x - w / 2 + 2, y - h / 2 + 2, w - 4, Math.max(0, h - 4));
+    ctx.restore();
     ctx.fillStyle = Theme.icon.batteryShell;
     ctx.fillRect(x - 3, y - h / 2 - 4, 6, 4);
   },
@@ -510,6 +590,10 @@ const Util = {
     ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = Theme.icon.pillHalf; ctx.fillRect(x - 9, y - 9, 9, 18);
     ctx.fillStyle = color; ctx.fillRect(x, y - 9, 9, 18);
+    // a small capsule-sheen streak across both halves — a plain flat split
+    // reads as two paint chips; the highlight sells it as a glossy capsule
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.beginPath(); ctx.ellipse(x - 3, y - 4, 4, 1.6, -0.5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     ctx.strokeStyle = Theme.shadow.outline; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke();
@@ -580,6 +664,7 @@ const Util = {
       // pale/white heart — matches the pale HUD pip it grants (ui.js)
       case 'eternalheart': Util.drawHeart(ctx, x - 9, y - 9, 18, 1, Theme.icon.pillHalf, Theme.icon.heartRedLine); break;
       case 'sack': Util.drawSackIcon(ctx, x, y); break;
+      case 'trashbag': Util.drawSackIcon(ctx, x, y, Theme.icon.trashBag, Theme.icon.trashBagSeam); break;
       case 'battery': Util.drawBatteryIcon(ctx, x, y, 1); break;
       case 'minibattery': Util.drawBatteryIcon(ctx, x, y, 0.7); break;
       case 'pill': Util.drawPillIcon(ctx, x, y, PILL_COLORS_BY_ID[p.pillColor].color); break;
@@ -609,9 +694,16 @@ const Util = {
     if (def.requires === 'bomb') {
       ctx.fillStyle = Theme.chest.lockBomb;
       ctx.beginPath(); ctx.arc(c.x, c.y + 2, 3.5, 0, Math.PI * 2); ctx.fill();
+      // a small keyhole notch — a plain filled disc reads as a rivet, not a lock
+      ctx.fillStyle = 'rgba(0,0,0,.4)';
+      ctx.beginPath(); ctx.arc(c.x, c.y + 1.2, 1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(c.x - 0.6, c.y + 1.5, 1.2, 2);
     } else if (def.requires === 'key') {
       ctx.fillStyle = Theme.chest.lockKey;
       ctx.beginPath(); ctx.arc(c.x, c.y + 2, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.4)';
+      ctx.beginPath(); ctx.arc(c.x, c.y + 1.2, 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(c.x - 0.5, c.y + 1.4, 1, 1.8);
     } else if (def.requires === 'hearts') {
       ctx.fillStyle = Theme.chest.lockHeart; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('♥', c.x, c.y + 3);

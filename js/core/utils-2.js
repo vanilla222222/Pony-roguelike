@@ -227,6 +227,44 @@ Object.assign(Util, {
       return;
     }
 
+    // Phase 14 visual pass — face the direction of actual travel. e.vx isn't
+    // reliably maintained by every AI script (most move via direct
+    // tryMoveEntity dx/dy, not a persisted velocity), so this derives facing
+    // itself from frame-to-frame x movement rather than trusting e.vx. A
+    // small deadzone (0.3px/frame) plus "only flip when it changes" keeps a
+    // barely-jittering enemy from flickering between the two mirrored poses.
+    if (e._faceSignPrevX !== undefined) {
+      const dxFace = e.x - e._faceSignPrevX;
+      if (dxFace > 0.3) e._faceSign = 1;
+      else if (dxFace < -0.3) e._faceSign = -1;
+    }
+    e._faceSignPrevX = e.x;
+    // bosses/superbosses are excluded — a mirrored boss would also mirror
+    // the superboss's fillText icon glyph (backwards text), and the baked-
+    // sprite path already treats bosses as a separate, always-live case
+    const faceSign = (!isBoss && e._faceSign) || 1;
+    // moved up from just below the shadow draw (Phase 12) so the breathing
+    // term right below can reuse it — same per-enemy desync value throughout
+    const phase = (e.x + e.y) * 0.05;
+    // Phase 14 visual pass — a quick squash-and-stretch "oof" while e.hitFlash
+    // is counting down. hitFlash is shared with several AI telegraph tells
+    // (ai-1/3/4.js flash a wind-up the same way combat does a landed hit), so
+    // this reads as "something just happened to this enemy" in both cases —
+    // consistent with the flash recolor itself, which already makes no
+    // distinction between the two causes. No fixed max exists across call
+    // sites (0.1/0.12/0.15 are all used), so 0.15 is just the ceiling clamp.
+    const squashT = isBoss ? 0 : Util.clamp((e.hitFlash || 0) / 0.15, 0, 1);
+    // ambient idle "breathing" scale, faded out while the hit-squash is
+    // active so the two never fight each other — imperceptibly moves the
+    // shadow ellipse too (both are in the same transform), which is fine:
+    // a breathing chest wouldn't visibly shift its own ground shadow anyway
+    const breathe = Math.sin(now / 900 + phase) * 0.025 * (1 - squashT);
+    const squashX = 1 + 0.14 * squashT + breathe, squashY = 1 - 0.14 * squashT + breathe;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.scale(faceSign * squashX, squashY);
+    ctx.translate(-e.x, -e.y);
+
     // `flies` (entities.js copies it off the type) is the authority on being
     // airborne — orbiters carry it too, and used to get a grounded walk cycle
     const flyer = behavior === 'flyer' || !!e.flies;
@@ -237,7 +275,6 @@ Object.assign(Util, {
     ctx.ellipse(e.x, e.y + r * (flyer ? 0.95 : 0.7), r * (flyer ? 0.55 : 0.8), r * (flyer ? 0.16 : 0.28), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const phase = (e.x + e.y) * 0.05;
     if (flyer) {
       // wings instead of legs — small membrane flaps, faster when moving
       const flap = Math.sin(now / (moving ? 90 : 260) + phase) * (moving ? 0.45 : 0.15);
@@ -258,6 +295,26 @@ Object.assign(Util, {
     else Util._humanoidStatic(ctx, e, flash);
 
     const hx = e.x, hy = e.y - r * 0.75;
+
+    // Phase 14 visual pass — a periodic blink, live-only (baking it would
+    // freeze the eyes at whichever open/closed frame first got baked). Every
+    // enemy blinks on its own offset via `phase` so a room full of the same
+    // type doesn't blink in lockstep. Drawn as a pair of thin lid ellipses
+    // directly over the static eyes' position/size (see _humanoidStatic),
+    // in `dark` so it reads as the same body material closing over the eye.
+    // 'sentry' draws its own oversized eye over the default pair (see the
+    // gaze-drift flourish below) — a small lid at the default eye position
+    // would sit stranded on top of that much bigger shape, so it skips this
+    if (!flash && behavior !== 'sentry') {
+      const blinkCycle = 3400;
+      const t = ((now + phase * 1000) % blinkCycle + blinkCycle) % blinkCycle;
+      if (t < 120) {
+        const k = 1 - Math.abs(t - 60) / 60; // 0 -> 1 -> 0 across the blink window
+        ctx.fillStyle = dark;
+        ctx.beginPath(); ctx.ellipse(e.x - r * 0.18, e.y - r * 0.78, r * 0.09, Math.max(0.4, r * 0.09 * k), 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(e.x + r * 0.18, e.y - r * 0.78, r * 0.09, Math.max(0.4, r * 0.09 * k), 0, 0, Math.PI * 2); ctx.fill();
+      }
+    }
 
     /* ---- live gear flourishes ------------------------------------
        One small animated accent per behavior, drawn ON TOP of the body
@@ -485,13 +542,25 @@ Object.assign(Util, {
       }
     }
 
+    ctx.restore(); // pairs with the facing-flip save() near the top of this function
     if ((e.maxHp > 3 || (forceHealthBar && e.maxHp > 0)) && !isBoss) Util.drawEnemyHealthBar(ctx, e);
   },
 
   drawEnemyHealthBar(ctx, e){
-    const w = e.radius * 1.8;
-    ctx.fillStyle = Theme.ui.hpBarBack; ctx.fillRect(e.x - w / 2, e.y - e.radius - 14, w, 4);
-    ctx.fillStyle = Theme.ui.hpBarFill; ctx.fillRect(e.x - w / 2, e.y - e.radius - 14, w * Util.clamp(e.hp / e.maxHp, 0, 1), 4);
+    const w = e.radius * 1.8, barY = e.y - e.radius - 14;
+    ctx.fillStyle = Theme.ui.hpBarBack; ctx.fillRect(e.x - w / 2, barY, w, 4);
+    // Phase 12 visual pass (canvas batch) — a 2-stop gradient instead of one
+    // flat fill, and a thin dark keyline so the bar reads as a distinct
+    // object against a busy background instead of a borderless color bar.
+    // Deliberately NO shadowBlur here (unlike the boss bar) — many of these
+    // can be on screen at once, so this stays as cheap as the original.
+    const grad = ctx.createLinearGradient(e.x, barY, e.x, barY + 4);
+    grad.addColorStop(0, '#a8e896');
+    grad.addColorStop(1, Theme.ui.hpBarFill);
+    ctx.fillStyle = grad;
+    ctx.fillRect(e.x - w / 2, barY, w * Util.clamp(e.hp / e.maxHp, 0, 1), 4);
+    ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1;
+    ctx.strokeRect(e.x - w / 2 + 0.5, barY + 0.5, w - 1, 3);
   },
 
   // a small vending-machine fixture — every shop room's donation machine
@@ -502,7 +571,15 @@ Object.assign(Util, {
     const w = 28, h = 34;
     ctx.fillStyle = Theme.shadow.groundSoft;
     ctx.beginPath(); ctx.ellipse(x, y + h / 2 + 3, w * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = Theme.machine.body;
+    // Phase 12 visual pass (canvas batch) — a top-lit linear sheen instead
+    // of a flat fill, the rectangular-chassis equivalent of Util.bodyShade's
+    // sphere treatment; every one of this room's fixtures gets the same one.
+    {
+      const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+      g.addColorStop(0, Util.shadeColor(Theme.machine.body, 0.25));
+      g.addColorStop(1, Util.shadeColor(Theme.machine.body, -0.15));
+      ctx.fillStyle = g;
+    }
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
     ctx.strokeStyle = Theme.machine.frame; ctx.lineWidth = 2;
     ctx.strokeRect(x - w / 2, y - h / 2, w, h);
@@ -510,8 +587,14 @@ Object.assign(Util, {
     ctx.fillStyle = Theme.machine.meterBg;
     ctx.fillRect(meterX, meterTop, meterW, meterH);
     const fillH = meterH * Util.clamp(frac, 0, 1);
+    // a small glow behind the rising fill — only one donation machine ever
+    // exists per room, so shadowBlur here is free, unlike the enemy health
+    // bar above where the same treatment would multiply per enemy on screen
+    ctx.save();
+    ctx.shadowColor = Theme.machine.meterFill; ctx.shadowBlur = 5;
     ctx.fillStyle = Theme.machine.meterFill;
     ctx.fillRect(meterX, meterTop + meterH - fillH, meterW, fillH);
+    ctx.restore();
     ctx.fillStyle = Theme.machine.slot;
     ctx.fillRect(x - 1, y - h / 2 + 8, 3, 10);
     ctx.fillStyle = Theme.machine.label;
@@ -527,7 +610,12 @@ Object.assign(Util, {
     const w = 30, h = 22;
     ctx.fillStyle = Theme.shadow.groundSoft;
     ctx.beginPath(); ctx.ellipse(x, y + h / 2 + 3, w * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = Theme.machine.altarBody;
+    {
+      const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+      g.addColorStop(0, Util.shadeColor(Theme.machine.altarBody, 0.25));
+      g.addColorStop(1, Util.shadeColor(Theme.machine.altarBody, -0.15));
+      ctx.fillStyle = g;
+    }
     Util.drawRoundedRect(ctx, x - w / 2, y - h / 2, w, h, 3); ctx.fill();
     ctx.strokeStyle = Theme.machine.altarFrame; ctx.lineWidth = 2;
     Util.drawRoundedRect(ctx, x - w / 2, y - h / 2, w, h, 3); ctx.stroke();
@@ -535,6 +623,7 @@ Object.assign(Util, {
     ctx.save();
     ctx.translate(x, y - h / 2 - 7);
     ctx.rotate(((now || 0) / 700) % (Math.PI * 2));
+    ctx.shadowColor = Theme.machine.altarGlow; ctx.shadowBlur = 6;
     ctx.strokeStyle = Theme.machine.altarGlow; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(0, 0, 7, 0.5, Math.PI * 1.75); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(7, -2.5); ctx.lineTo(4, 2); ctx.lineTo(10, 2); ctx.closePath();
@@ -586,7 +675,12 @@ Object.assign(Util, {
     const w = 28, h = 34;
     ctx.fillStyle = Theme.shadow.groundSoft;
     ctx.beginPath(); ctx.ellipse(x, y + h / 2 + 3, w * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = Theme.machine.friendshipBody;
+    {
+      const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+      g.addColorStop(0, Util.shadeColor(Theme.machine.friendshipBody, 0.25));
+      g.addColorStop(1, Util.shadeColor(Theme.machine.friendshipBody, -0.15));
+      ctx.fillStyle = g;
+    }
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
     ctx.strokeStyle = Theme.machine.friendshipFrame; ctx.lineWidth = 2;
     ctx.strokeRect(x - w / 2, y - h / 2, w, h);
@@ -598,7 +692,12 @@ Object.assign(Util, {
     const w = 28, h = 34;
     ctx.fillStyle = Theme.shadow.groundSoft;
     ctx.beginPath(); ctx.ellipse(x, y + h / 2 + 3, w * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = Theme.machine.toolsBody;
+    {
+      const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+      g.addColorStop(0, Util.shadeColor(Theme.machine.toolsBody, 0.25));
+      g.addColorStop(1, Util.shadeColor(Theme.machine.toolsBody, -0.15));
+      ctx.fillStyle = g;
+    }
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
     ctx.strokeStyle = Theme.machine.toolsFrame; ctx.lineWidth = 2;
     ctx.strokeRect(x - w / 2, y - h / 2, w, h);
@@ -610,7 +709,12 @@ Object.assign(Util, {
     const w = 28, h = 34;
     ctx.fillStyle = Theme.shadow.groundSoft;
     ctx.beginPath(); ctx.ellipse(x, y + h / 2 + 3, w * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = Theme.machine.darkBody;
+    {
+      const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+      g.addColorStop(0, Util.shadeColor(Theme.machine.darkBody, 0.25));
+      g.addColorStop(1, Util.shadeColor(Theme.machine.darkBody, -0.15));
+      ctx.fillStyle = g;
+    }
     ctx.fillRect(x - w / 2, y - h / 2, w, h);
     ctx.strokeStyle = Theme.machine.darkFrame; ctx.lineWidth = 2;
     ctx.strokeRect(x - w / 2, y - h / 2, w, h);
@@ -726,8 +830,12 @@ Object.assign(Util, {
     }
 
     // tail — a small curved flag opposite the facing direction; sea ponies
-    // get a fin-shaped variant instead of the plain ellipse
-    const tailAng = angle + Math.PI;
+    // get a fin-shaped variant instead of the plain ellipse. Phase 14 visual
+    // pass — a gentle continuous sway (faster/wider while moving, same
+    // legPhase-style split every other animated part here already uses) so
+    // it doesn't just sit rigidly opposite the facing angle.
+    const tailSway = (opts.moving ? Math.sin(now / 220) * 0.22 : Math.sin(now / 800) * 0.08);
+    const tailAng = angle + Math.PI + tailSway;
     const tx = Math.cos(tailAng) * size * 0.46, ty = Math.sin(tailAng) * size * 0.3 + size * 0.1;
     ctx.fillStyle = maneColor;
     if (opts.hasFinTail) {
@@ -815,17 +923,21 @@ Object.assign(Util, {
       }
     }
 
-    // ears — bat pony gets taller, pointier ones
+    // ears — bat pony gets taller, pointier ones. Phase 14 visual pass — a
+    // small independent twitch per ear (offset phases so they don't swivel
+    // in unison, reads as alert little flicks rather than one rigid pair)
     ctx.fillStyle = bodyGrad;
     const earLen = opts.hasFangs ? 0.48 : 0.4;
+    const earTwitchL = Math.sin(now / 340) * 0.03;
+    const earTwitchR = Math.sin(now / 340 + 1.9) * 0.03;
     ctx.beginPath();
     ctx.moveTo(hx - size * 0.16, hy - size * 0.2);
-    ctx.lineTo(hx - size * 0.26, hy - size * earLen);
+    ctx.lineTo(hx - size * (0.26 + earTwitchL), hy - size * earLen);
     ctx.lineTo(hx - size * 0.04, hy - size * 0.28);
     ctx.closePath(); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(hx + size * 0.16, hy - size * 0.2);
-    ctx.lineTo(hx + size * 0.26, hy - size * earLen);
+    ctx.lineTo(hx + size * (0.26 + earTwitchR), hy - size * earLen);
     ctx.lineTo(hx + size * 0.04, hy - size * 0.28);
     ctx.closePath(); ctx.fill();
 
@@ -878,6 +990,12 @@ Object.assign(Util, {
     }
 
     if (!opts.flash) {
+      // Phase 14 visual pass — a periodic blink, skipped for robot eyes
+      // (a glowing mechanical lens has no lid to close). Single fixed cycle
+      // is fine here — unlike the enemy version there's only ever one pony
+      // on screen, so there's no lockstep-room risk to desync away from.
+      const blinking = !opts.isRobot && (((now % 3600) + 3600) % 3600) < 110;
+      const blinkK = blinking ? 1 - Math.abs((((now % 3600) + 3600) % 3600) - 55) / 55 : 0;
       // a proper white-plus-pupil-plus-glint eye instead of a flat dot —
       // reads as expressive at this size instead of a blank stare.
       // Both eyes: the ±1.2 offset mirrors the pair across the facing axis,
@@ -885,6 +1003,11 @@ Object.assign(Util, {
       for (const s of [-1, 1]) {
         const ex = hx + Math.cos(angle) * size * 0.1 + Math.cos(angle + s * 1.2) * size * 0.12;
         const ey = hy + Math.sin(angle) * size * 0.1 + Math.sin(angle + s * 1.2) * size * 0.12;
+        if (blinking) {
+          ctx.fillStyle = bodyColor;
+          ctx.beginPath(); ctx.ellipse(ex, ey, size * 0.062, Math.max(size * 0.008, size * 0.05 * blinkK), angle, 0, Math.PI * 2); ctx.fill();
+          continue;
+        }
         if (!opts.isRobot) {
           ctx.fillStyle = Theme.pony.eyeWhite;
           ctx.beginPath(); ctx.ellipse(ex, ey, size * 0.062, size * 0.05, angle, 0, Math.PI * 2); ctx.fill();

@@ -312,10 +312,18 @@ addAchievement({ id:'sharpenedaim', name:'Sharpened Aim', icon:'🏹',
   desc:'Defeat 200 enemies with ranged attacks.', category:'Miscellaneous', familiarId:'chargebot', statKey:'rangedKills', threshold:200 });
 
 // ---- 6. donation machine — every shop room has one, see shop.js's
-// tryDonateMachine. 20 tiers, one every 50c up its 1000c lifetime cap:
-// one -1c discount per buyable kind (10, matching shop.js's
-// SHOP_BASE_PRICES exactly) plus 4 items / 3 trinkets / 3 familiars,
-// each an exclusive reward same as the superboss achievements above ----
+// tryDonateMachine. 20 tiers, one every 50c up to the old 1000c "fully
+// funded" mark: one -1c discount per buyable kind (10, matching shop.js's
+// SHOP_BASE_PRICES exactly) plus 4 items / 3 trinkets / 3 familiars, each
+// an exclusive reward same as the superboss achievements above. Past
+// 1000c the machine keeps taking coin up to its real cap (shop.js's
+// DONATION_CAP, 5000c) but new achievement tiers only come once every
+// 1000c from here — every -1c discount kind is already spoken for by
+// 1000c, so these four pay a flat skill-point bonus instead (see
+// logic.js's unlockAchievement def.skillPoints handling). Independently
+// of every tier below, every 25c donated (the whole way to 5000c) also
+// pays 1 skill point directly on its own drip — see shop.js's
+// tryDonateMachine/awardDonationSkillPoints in logic.js. ----
 addAchievement({ id:'donation_50', name:'First Contribution', icon:'❤️',
   desc:'Donate 50c total to a donation machine.', category:'Donations', statKey:'donationTotal', threshold:50, shopDiscount:'heartRed' });
 addAchievement({ id:'donation_100', name:"Giant's Blessing", icon:'💖',
@@ -356,6 +364,18 @@ addAchievement({ id:'donation_950', name:'Familiar Discount', icon:'🐾',
   desc:'Donate 950c total to a donation machine.', category:'Donations', statKey:'donationTotal', threshold:950, shopDiscount:'familiar' });
 addAchievement({ id:'donation_1000', name:'Philanthropist', icon:'💵',
   desc:'Donate 1000c total to a donation machine — fully funded!', category:'Donations', statKey:'donationTotal', threshold:1000, itemId:'windfall' });
+// past 1000c — every -1c discount kind and the last of the item/trinket/
+// familiar exclusives are already handed out above, so these four just
+// pay a chunky flat skill-point bonus each, on top of the every-25c drip
+// that's already been running the whole time (see awardDonationSkillPoints).
+addAchievement({ id:'donation_2000', name:'Grand Benefactor', icon:'🌟',
+  desc:'Donate 2000c total to a donation machine.', category:'Donations', statKey:'donationTotal', threshold:2000, skillPoints:10 });
+addAchievement({ id:'donation_3000', name:'Pillar of the Community', icon:'🏛️',
+  desc:'Donate 3000c total to a donation machine.', category:'Donations', statKey:'donationTotal', threshold:3000, skillPoints:10 });
+addAchievement({ id:'donation_4000', name:'Living Legend', icon:'🗿',
+  desc:'Donate 4000c total to a donation machine.', category:'Donations', statKey:'donationTotal', threshold:4000, skillPoints:10 });
+addAchievement({ id:'donation_5000', name:'Boundless Generosity', icon:'♾️',
+  desc:'Donate 5000c total to a donation machine — the machine can hold no more.', category:'Donations', statKey:'donationTotal', threshold:5000, skillPoints:15 });
 
 // ---- 7. the 20 newest passives (data.js) — Isaac-style unlock conditions,
 // some just a fresh stat threshold, a few bespoke one-off triggers (see

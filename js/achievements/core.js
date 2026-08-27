@@ -35,6 +35,10 @@
      unlocks.unlockedEnemies  — { enemyId: true, ... } (read by
                                  isEnemyUnlocked()/room.js's
                                  resolveGenericEnemy())
+     unlocks.unlockedPaths    — { C:bool, D:bool } — which alternate
+                                 routes have been earned (read by
+                                 isPathUnlocked()/dungeon.js's
+                                 cpathgate + planetarium gate rooms)
      unlocks.stats            — lifetime counters that misc
                                  achievements threshold against,
                                  including .donationTotal — lifetime
@@ -100,6 +104,19 @@ function isPillColorUnlocked(colorId){
 // `locked` field and are unaffected.
 function isEnemyUnlocked(enemyId){
   return !!currentUnlocks().unlockedEnemies[enemyId];
+}
+
+// alternate routes — 'C' (the drowned path, entered from floor 2's cpathgate
+// room) and 'D' (the starlit path, entered from floor 3's planetarium room).
+// Phase 10 made both earned: C unlocks by clearing the main route as it stood
+// before Phase 10 (stages.js's OLD_MAIN_ROUTE_FINAL_FLOOR), D by clearing the
+// C route. Read by dungeon.js's generateDungeon, which simply doesn't attach
+// the corresponding gate room while the path is locked — exactly the way a
+// locked enemy is filtered out of the spawn pools rather than erroring.
+// Reads the run snapshot like every other gate here, so a path earned mid-run
+// opens on the NEXT run, never the current one.
+function isPathUnlocked(path){
+  return !!currentUnlocks().unlockedPaths[path];
 }
 
 const ACHIEVEMENTS = [];

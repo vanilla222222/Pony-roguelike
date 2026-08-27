@@ -31,170 +31,38 @@
    behaviors (chaser/turret/summoner/shielder/ambusher/weaver).
    ============================================================ */
 
-addTierSet({ baseId:'slayer_rootwraith', name:'Root Wraith Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'rootwraith',
-  desc: n => 'Defeat ' + n + ' of the DNB Root Wraith.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_rootwraith_t1' }, { threshold:40, trinketId:'rootboundtalon' } ] });
 
-addTierSet({ baseId:'slayer_saltheron', name:'Salt Heron Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'saltheron',
-  desc: n => 'Defeat ' + n + ' of the DNB Salt Heron.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_saltheron_t1' }, { threshold:40, itemId:'mgtrophy_saltheron_t2' } ] });
 
-addTierSet({ baseId:'slayer_tidebloat', name:'Tide Bloat Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'tidebloat',
-  desc: n => 'Defeat ' + n + ' of the DNB Tide Bloat.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_tidebloat_t1' }, { threshold:40, itemId:'mgtrophy_tidebloat_t2' } ] });
 
-addTierSet({ baseId:'slayer_brineplate', name:'Brine Plate Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'brineplate',
-  desc: n => 'Defeat ' + n + ' of the DNB Brine Plate.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_brineplate_t1' }, { threshold:40, itemId:'mgtrophy_brineplate_t2' } ] });
 
-addTierSet({ baseId:'slayer_mudtuskram', name:'Mudtusk Ram Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mudtuskram',
-  desc: n => 'Defeat ' + n + ' of the DNB Mudtusk Ram.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mudtuskram_t1' }, { threshold:40, itemId:'mgtrophy_mudtuskram_t2' } ] });
 
-addTierSet({ baseId:'slayer_barnaclespike', name:'Barnacle Spike Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'barnaclespike',
-  desc: n => 'Defeat ' + n + ' of the DNB Barnacle Spike.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_barnaclespike_t1' }, { threshold:40, itemId:'barnaclecrown' } ] });
 
-addTierSet({ baseId:'slayer_mudskipper', name:'Mudskipper Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mudskipper',
-  desc: n => 'Defeat ' + n + ' of the DNB Mudskipper.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mudskipper_t1' }, { threshold:40, itemId:'mgtrophy_mudskipper_t2' } ] });
 
-addTierSet({ baseId:'slayer_eelspitter', name:'Eel Spitter Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'eelspitter',
-  desc: n => 'Defeat ' + n + ' of the DNB Eel Spitter.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_eelspitter_t1' }, { threshold:40, itemId:'mgtrophy_eelspitter_t2' } ] });
 
-addTierSet({ baseId:'slayer_crabmortar', name:'Crab Mortar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'crabmortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Crab Mortar.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_crabmortar_t1' }, { threshold:40, itemId:'mgtrophy_crabmortar_t2' } ] });
 
-addTierSet({ baseId:'slayer_mangroveviper', name:'Mangrove Viper Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mangroveviper',
-  desc: n => 'Defeat ' + n + ' of the DNB Mangrove Viper.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mangroveviper_t1' }, { threshold:40, itemId:'viperscoil' } ] });
 
-addTierSet({ baseId:'slayer_tidewatcher', name:'Tide Watcher Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'tidewatcher',
-  desc: n => 'Defeat ' + n + ' of the DNB Tide Watcher.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_tidewatcher_t1' }, { threshold:40, itemId:'mgtrophy_tidewatcher_t2' } ] });
 
-addTierSet({ baseId:'slayer_siltswirl', name:'Silt Swirl Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'siltswirl',
-  desc: n => 'Defeat ' + n + ' of the DNB Silt Swirl.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_siltswirl_t1' }, { threshold:40, itemId:'mgtrophy_siltswirl_t2' } ] });
 
-addTierSet({ baseId:'slayer_fiddlerborer', name:'Fiddler Borer Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'fiddlerborer',
-  desc: n => 'Defeat ' + n + ' of the DNB Fiddler Borer.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_fiddlerborer_t1' }, { threshold:40, itemId:'mgtrophy_fiddlerborer_t2' } ] });
 
-addTierSet({ baseId:'slayer_silthopper', name:'Silt Hopper Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'silthopper',
-  desc: n => 'Defeat ' + n + ' of the DNB Silt Hopper.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_silthopper_t1' }, { threshold:40, itemId:'mgtrophy_silthopper_t2' } ] });
 
-addTierSet({ baseId:'slayer_brinesack', name:'Brine Sack Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'brinesack',
-  desc: n => 'Defeat ' + n + ' of the DNB Brine Sack.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_brinesack_t1' }, { threshold:40, itemId:'mgtrophy_brinesack_t2' } ] });
 
-addTierSet({ baseId:'slayer_hivewader', name:'Hive Wader Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hivewader',
-  desc: n => 'Defeat ' + n + ' of the DNB Hive Wader.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_hivewader_t1' }, { threshold:40, familiarId:'siltswarmling' } ] });
 
-addTierSet({ baseId:'slayer_mangrovemender', name:'Mangrove Mender Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mangrovemender',
-  desc: n => 'Defeat ' + n + ' of the DNB Mangrove Mender.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mangrovemender_t1' }, { threshold:40, itemId:'mgtrophy_mangrovemender_t2' } ] });
 
-addTierSet({ baseId:'slayer_tidewarden', name:'Tide Warden Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'tidewarden',
-  desc: n => 'Defeat ' + n + ' of the DNB Tide Warden.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_tidewarden_t1' }, { threshold:40, itemId:'tidewardenaegis' } ] });
 
-addTierSet({ baseId:'slayer_heronmarksman', name:'Heron Marksman Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'heronmarksman',
-  desc: n => 'Defeat ' + n + ' of the DNB Heron Marksman.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_heronmarksman_t1' }, { threshold:40, itemId:'mgtrophy_heronmarksman_t2' } ] });
 
-addTierSet({ baseId:'slayer_brackblink', name:'Brack Blink Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'brackblink',
-  desc: n => 'Defeat ' + n + ' of the DNB Brack Blink.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_brackblink_t1' }, { threshold:40, itemId:'mgtrophy_brackblink_t2' } ] });
 
-addTierSet({ baseId:'slayer_crocshade', name:'Croc Shade Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'crocshade',
-  desc: n => 'Defeat ' + n + ' of the DNB Croc Shade.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_crocshade_t1' }, { threshold:40, trinketId:'crocshadefang' } ] });
 
-addTierSet({ baseId:'slayer_mireloper', name:'Mire Loper Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mireloper',
-  desc: n => 'Defeat ' + n + ' of the DNB Mire Loper.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mireloper_t1' }, { threshold:40, itemId:'mgtrophy_mireloper_t2' } ] });
 
-addTierSet({ baseId:'slayer_tidedasher', name:'Tide Dasher Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'tidedasher',
-  desc: n => 'Defeat ' + n + ' of the DNB Tide Dasher.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_tidedasher_t1' }, { threshold:40, itemId:'mgtrophy_tidedasher_t2' } ] });
 
-addTierSet({ baseId:'slayer_saltspitter', name:'Salt Spitter Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'saltspitter',
-  desc: n => 'Defeat ' + n + ' of the DNB Salt Spitter.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_saltspitter_t1' }, { threshold:40, itemId:'mgtrophy_saltspitter_t2' } ] });
 
-addTierSet({ baseId:'slayer_bloatbladder', name:'Bloat Bladder Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'bloatbladder',
-  desc: n => 'Defeat ' + n + ' of the DNB Bloat Bladder.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_bloatbladder_t1' }, { threshold:40, itemId:'mgtrophy_bloatbladder_t2' } ] });
 
-addTierSet({ baseId:'slayer_mangrovebat', name:'Mangrove Bat Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mangrovebat',
-  desc: n => 'Defeat ' + n + ' of the DNB Mangrove Bat.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mangrovebat_t1' }, { threshold:40, itemId:'mgtrophy_mangrovebat_t2' } ] });
 
-addTierSet({ baseId:'slayer_siltboar', name:'Silt Boar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'siltboar',
-  desc: n => 'Defeat ' + n + ' of the DNB Silt Boar.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_siltboar_t1' }, { threshold:40, itemId:'mgtrophy_siltboar_t2' } ] });
 
-addTierSet({ baseId:'slayer_mudmortar', name:'Mud Mortar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mudmortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Mud Mortar.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mudmortar_t1' }, { threshold:40, itemId:'mgtrophy_mudmortar_t2' } ] });
 
-addTierSet({ baseId:'slayer_mudlobster', name:'Mud Lobster Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'mudlobster',
-  desc: n => 'Defeat ' + n + ' of the DNB Mud Lobster.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_mudlobster_t1' }, { threshold:40, itemId:'mgtrophy_mudlobster_t2' } ] });
 
-addTierSet({ baseId:'slayer_duskcircler', name:'Dusk Circler Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'duskcircler',
-  desc: n => 'Defeat ' + n + ' of the DNB Dusk Circler.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_duskcircler_t1' }, { threshold:40, itemId:'mgtrophy_duskcircler_t2' } ] });
 
-addTierSet({ baseId:'slayer_rootsentinel', name:'Root Sentinel Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'rootsentinel',
-  desc: n => 'Defeat ' + n + ' of the DNB Root Sentinel.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_rootsentinel_t1' }, { threshold:40, itemId:'mgtrophy_rootsentinel_t2' } ] });
 
-addTierSet({ baseId:'slayer_brackmist', name:'Brack Mist Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'brackmist',
-  desc: n => 'Defeat ' + n + ' of the DNB Brack Mist.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_brackmist_t1' }, { threshold:40, itemId:'mgtrophy_brackmist_t2' } ] });
 
-addTierSet({ baseId:'slayer_shellbulk', name:'Shell Bulk Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'shellbulk',
-  desc: n => 'Defeat ' + n + ' of the DNB Shell Bulk.',
-  tiers:[ { threshold:10, itemId:'mgtrophy_shellbulk_t1' }, { threshold:40, itemId:'mgtrophy_shellbulk_t2' } ] });
 
 
 /* ============================================================

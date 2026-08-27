@@ -38,170 +38,38 @@
    another trophy.
    ============================================================ */
 
-addTierSet({ baseId:'slayer_voidwisp', name:'Void Wisp Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'voidwisp',
-  desc: n => 'Defeat ' + n + ' of the DNB Void Wisp.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_voidwisp_t1' }, { threshold:40, itemId:'vbtrophy_slayer_voidwisp_t2' } ] });
 
-addTierSet({ baseId:'slayer_derelictmoth', name:'Derelict Moth Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'derelictmoth',
-  desc: n => 'Defeat ' + n + ' of the DNB Derelict Moth.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_derelictmoth_t1' }, { threshold:40, itemId:'vbtrophy_slayer_derelictmoth_t2' } ] });
 
-addTierSet({ baseId:'slayer_wreckspark', name:'Wreck Spark Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wreckspark',
-  desc: n => 'Defeat ' + n + ' of the DNB Wreck Spark.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_wreckspark_t1' }, { threshold:40, itemId:'vbtrophy_slayer_wreckspark_t2' } ] });
 
-addTierSet({ baseId:'slayer_hullplate', name:'Hull Plate Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hullplate',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Plate.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hullplate_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hullplate_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftram', name:'Drift Ram Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftram',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Ram.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftram_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftram_t2' } ] });
 
-addTierSet({ baseId:'slayer_silentturret', name:'Silent Turret Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'silentturret',
-  desc: n => 'Defeat ' + n + ' of the DNB Silent Turret.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_silentturret_t1' }, { threshold:40, itemId:'vbtrophy_slayer_silentturret_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftleaper', name:'Drift Leaper Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftleaper',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Leaper.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftleaper_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftleaper_t2' } ] });
 
-addTierSet({ baseId:'slayer_voidslinger', name:'Void Slinger Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'voidslinger',
-  desc: n => 'Defeat ' + n + ' of the DNB Void Slinger.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_voidslinger_t1' }, { threshold:40, itemId:'vbtrophy_slayer_voidslinger_t2' } ] });
 
-addTierSet({ baseId:'slayer_wreckmortar', name:'Wreck Mortar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wreckmortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Wreck Mortar.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_wreckmortar_t1' }, { threshold:40, itemId:'vbtrophy_slayer_wreckmortar_t2' } ] });
 
-addTierSet({ baseId:'slayer_stardrift', name:'Star Drift Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'stardrift',
-  desc: n => 'Defeat ' + n + ' of the DNB Star Drift.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_stardrift_t1' }, { threshold:40, itemId:'vbtrophy_slayer_stardrift_t2' } ] });
 
-addTierSet({ baseId:'slayer_hulkwatcher', name:'Hulk Watcher Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hulkwatcher',
-  desc: n => 'Defeat ' + n + ' of the DNB Hulk Watcher.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hulkwatcher_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hulkwatcher_t2' } ] });
 
-addTierSet({ baseId:'slayer_debrissatellite', name:'Debris Satellite Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'debrissatellite',
-  desc: n => 'Defeat ' + n + ' of the DNB Debris Satellite.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_debrissatellite_t1' }, { threshold:40, itemId:'vbtrophy_slayer_debrissatellite_t2' } ] });
 
-addTierSet({ baseId:'slayer_hulltunneler', name:'Hull Tunneler Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hulltunneler',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Tunneler.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hulltunneler_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hulltunneler_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftmites', name:'Drift Mites Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftmites',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Mites.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftmites_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftmites_t2' } ] });
 
-addTierSet({ baseId:'slayer_wreckhusk', name:'Wreck Husk Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wreckhusk',
-  desc: n => 'Defeat ' + n + ' of the DNB Wreck Husk.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_wreckhusk_t1' }, { threshold:40, itemId:'vbtrophy_slayer_wreckhusk_t2' }, { threshold:100, itemId:'hullshardcore' } ] });
 
-addTierSet({ baseId:'slayer_voidcaller', name:'Void Caller Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'voidcaller',
-  desc: n => 'Defeat ' + n + ' of the DNB Void Caller.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_voidcaller_t1' }, { threshold:40, itemId:'vbtrophy_slayer_voidcaller_t2' }, { threshold:100, trinketId:'voidsummonschit' } ] });
 
-addTierSet({ baseId:'slayer_hullmender', name:'Hull Mender Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hullmender',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Mender.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hullmender_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hullmender_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftwarden', name:'Drift Warden Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftwarden',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Warden.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftwarden_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftwarden_t2' }, { threshold:100, itemId:'driftwardenplate' } ] });
 
-addTierSet({ baseId:'slayer_hulkmarksman', name:'Hulk Marksman Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hulkmarksman',
-  desc: n => 'Defeat ' + n + ' of the DNB Hulk Marksman.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hulkmarksman_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hulkmarksman_t2' }, { threshold:100, familiarId:'hulkmarksmandrone' } ] });
 
-addTierSet({ baseId:'slayer_hullblink', name:'Hull Blink Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hullblink',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Blink.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hullblink_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hullblink_t2' }, { threshold:100, itemId:'hullblinkanchor' } ] });
 
-addTierSet({ baseId:'slayer_shadowhulk', name:'Shadow Hulk Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'shadowhulk',
-  desc: n => 'Defeat ' + n + ' of the DNB Shadow Hulk.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_shadowhulk_t1' }, { threshold:40, itemId:'vbtrophy_slayer_shadowhulk_t2' }, { threshold:100, trinketId:'shadowhulkveil' } ] });
 
-addTierSet({ baseId:'slayer_derelicthound', name:'Derelict Hound Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'derelicthound',
-  desc: n => 'Defeat ' + n + ' of the DNB Derelict Hound.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_derelicthound_t1' }, { threshold:40, itemId:'vbtrophy_slayer_derelicthound_t2' } ] });
 
-addTierSet({ baseId:'slayer_comethusk', name:'Comet Husk Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'comethusk',
-  desc: n => 'Defeat ' + n + ' of the DNB Comet Husk.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_comethusk_t1' }, { threshold:40, itemId:'vbtrophy_slayer_comethusk_t2' } ] });
 
-addTierSet({ baseId:'slayer_wreckslinger', name:'Wreck Slinger Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wreckslinger',
-  desc: n => 'Defeat ' + n + ' of the DNB Wreck Slinger.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_wreckslinger_t1' }, { threshold:40, itemId:'vbtrophy_slayer_wreckslinger_t2' } ] });
 
-addTierSet({ baseId:'slayer_hullspark', name:'Hull Spark Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hullspark',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Spark.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hullspark_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hullspark_t2' } ] });
 
-addTierSet({ baseId:'slayer_duskmoth', name:'Dusk Moth Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'duskmoth',
-  desc: n => 'Defeat ' + n + ' of the DNB Dusk Moth.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_duskmoth_t1' }, { threshold:40, itemId:'vbtrophy_slayer_duskmoth_t2' } ] });
 
-addTierSet({ baseId:'slayer_hulkram', name:'Hulk Ram Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hulkram',
-  desc: n => 'Defeat ' + n + ' of the DNB Hulk Ram.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hulkram_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hulkram_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftmortar', name:'Drift Mortar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftmortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Mortar.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftmortar_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftmortar_t2' } ] });
 
-addTierSet({ baseId:'slayer_wrecktunneler', name:'Wreck Tunneler Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wrecktunneler',
-  desc: n => 'Defeat ' + n + ' of the DNB Wreck Tunneler.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_wrecktunneler_t1' }, { threshold:40, itemId:'vbtrophy_slayer_wrecktunneler_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftsatellite', name:'Drift Satellite Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftsatellite',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Satellite.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftsatellite_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftsatellite_t2' } ] });
 
-addTierSet({ baseId:'slayer_derelictsentinel', name:'Derelict Sentinel Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'derelictsentinel',
-  desc: n => 'Defeat ' + n + ' of the DNB Derelict Sentinel.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_derelictsentinel_t1' }, { threshold:40, itemId:'vbtrophy_slayer_derelictsentinel_t2' } ] });
 
-addTierSet({ baseId:'slayer_driftblink', name:'Drift Blink Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'driftblink',
-  desc: n => 'Defeat ' + n + ' of the DNB Drift Blink.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_driftblink_t1' }, { threshold:40, itemId:'vbtrophy_slayer_driftblink_t2' } ] });
 
-addTierSet({ baseId:'slayer_hullbulwark', name:'Hull Bulwark Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'hullbulwark',
-  desc: n => 'Defeat ' + n + ' of the DNB Hull Bulwark.',
-  tiers:[ { threshold:10, itemId:'vbtrophy_slayer_hullbulwark_t1' }, { threshold:40, itemId:'vbtrophy_slayer_hullbulwark_t2' } ] });
 /* ============================================================
    CHALLENGE — hand-wired Predicate D feats for floorKey '8D'
    ============================================================

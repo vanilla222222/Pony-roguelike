@@ -165,12 +165,6 @@ addAchievement({ id:'synergy_ecosystem', name:'Balance of Nature', icon:'🌿',
 // route through the exact same handleEnemyDeath -> bumpBestiaryCount call
 // regular enemies do). Reachable by any class that can reach Floor 5C and
 // win the fight.
-addAchievement({ id:'slayer_boss_eclipsewraith', name:'Eclipse Wraith Hunter', icon:'👹',
-  desc:'Defeat The Eclipse Wraith 5 times.', category:'Slayer', familiarId:'pocketimp',
-  bestiarySection:'enemyKills', bestiaryId:'eclipsewraith', threshold:5 });
-addAchievement({ id:'slayer_boss_ironbastion', name:'Iron Bastion Hunter', icon:'👹',
-  desc:'Defeat The Iron Bastion 5 times.', category:'Slayer', familiarId:'huntgrub',
-  bestiarySection:'enemyKills', bestiaryId:'ironbastion', threshold:5 });
 
 // -- Phase 2 leftover: one representative regular-enemy achievement for
 // Phase 2's new `skirmisher` behavior (DNB Gutter Skirmisher, 4C), same
@@ -181,9 +175,6 @@ addAchievement({ id:'slayer_boss_ironbastion', name:'Iron Bastion Hunter', icon:
 // already rewards discovering/killing every new id at least once for
 // free, so a full per-id sweep here would be pure volume without new
 // coverage; this one achievement stands in for the behavior family.
-addAchievement({ id:'slayer_gutterskirmisher', name:'Gutter Skirmisher Hunter', icon:'💀',
-  desc:'Defeat 20 of the DNB Gutter Skirmisher.', category:'Slayer', familiarId:'feastwyrm',
-  bestiarySection:'enemyKills', bestiaryId:'gutterskirmisher', threshold:20 });
 
 // -- Phase 3 leftovers: the two Shrine-region obstacles (thornbush,
 // luckcrystal), same single-shot "destroy this obstacle kind" shape as

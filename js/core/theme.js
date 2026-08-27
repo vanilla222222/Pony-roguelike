@@ -254,6 +254,8 @@ const Theme = {
     sack:         '#a97c4f',
     sackSeam:     '#6b4a2c',
     sackTie:      '#5c3f22',
+    trashBag:     '#4a6e3a', // Phase 16 — Trash Bag pickup, drawSackIcon's optional tint param
+    trashBagSeam: '#2c4522',
     batteryShell: '#33304f',
     batteryCharge:'#4fd1c5',
     pillHalf:     '#e8e8e8',

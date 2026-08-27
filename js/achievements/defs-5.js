@@ -1,29 +1,5 @@
 'use strict';
 // achievements/defs-5.js — split from achievements.js (part 5/6).
-addTierSet({ baseId:'slayer_rotmortar', name:'Rot Mortar Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'rotmortar',
-  desc: n => 'Defeat ' + n + ' of the DNB Rot Mortar.',
-  tiers:[ { threshold:5, pillColorId:'platinum' }, { threshold:20, trinketId:'concussiveescapement' }, { threshold:50, itemId:'slayertrophy_rotmortar' } ] });
-addTierSet({ baseId:'slayer_scolodelver', name:'Scolopendra Delver Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'scolodelver',
-  desc: n => 'Defeat ' + n + ' of the DNB Scolopendra Delver.',
-  tiers:[ { threshold:5, familiarId:'embersprite' }, { threshold:20, enemyId:'reliquarysplitter' }, { threshold:50, itemId:'slayertrophy_scolodelver' } ] });
-addTierSet({ baseId:'slayer_wraithcircler', name:'Wraith Circler Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'wraithcircler',
-  desc: n => 'Defeat ' + n + ' of the DNB Wraith Circler.',
-  tiers:[ { threshold:5, itemId:'heralddraught' }, { threshold:20, pillColorId:'brass' }, { threshold:50, itemId:'slayertrophy_wraithcircler' } ] });
-addTierSet({ baseId:'slayer_sepulcherwatcher', name:'Sepulcher Watcher Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'sepulcherwatcher',
-  desc: n => 'Defeat ' + n + ' of the DNB Sepulcher Watcher.',
-  tiers:[ { threshold:5, enemyId:'cursemites' }, { threshold:20, trinketId:'graspingcasing' }, { threshold:50, itemId:'slayertrophy_sepulcherwatcher' } ] });
-addTierSet({ baseId:'slayer_miasmashade', name:'Miasma Shade Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'miasmashade',
-  desc: n => 'Defeat ' + n + ' of the DNB Miasma Shade.',
-  tiers:[ { threshold:5, familiarId:'umbermagpie' }, { threshold:20, itemId:'heraldwhistle' }, { threshold:50, itemId:'slayertrophy_miasmashade' } ] });
-addTierSet({ baseId:'slayer_zigguratbulk', name:'Ziggurat Bulk Hunter', icon:'💀',
-  category:'Slayer', bestiarySection:'enemyKills', bestiaryId:'zigguratbulk',
-  desc: n => 'Defeat ' + n + ' of the DNB Ziggurat Bulk.',
-  tiers:[ { threshold:5, trinketId:'hagglersplinter' }, { threshold:20, pillColorId:'ultraviolet' }, { threshold:50, itemId:'slayertrophy_zigguratbulk' } ] });
 
 /* ---------------------------------------------------------------
    ==== MASTERY — stat-ladder achievements (Slice 3 of achievements-500) ====
