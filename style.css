@@ -96,6 +96,16 @@ body::after{
   body::before, body::after{ animation:none; }
 }
 
+/* ---------- menu backdrop motes (js/ui/menu-backdrop.js) ---------- */
+/* Fixed, full-viewport, painted below #app (position:relative below gives
+   #app's own stacking layer priority over any negative-z-index sibling
+   regardless of DOM order — see the comment on #menuBackdrop's <canvas> tag
+   in index.html). Sized in JS (canvas.width/height track window.inner*),
+   not CSS — a canvas's width/height ATTRIBUTES define its internal pixel
+   grid, which plain CSS width/height can't touch. */
+#menuBackdrop{ position:fixed; inset:0; z-index:-1; pointer-events:none; display:block; width:100%; height:100%; }
+@media (prefers-reduced-motion:reduce){ #menuBackdrop{ display:none; } }
+
 #app{ height:100%; width:100%; position:relative; }
 .screen{ height:100%; width:100%; display:flex; flex-direction:column; align-items:center; }
 .hidden{ display:none !important; }
@@ -120,6 +130,17 @@ body::after{
 .fullscreen-btn.active{ border-color:var(--accent2); color:var(--accent2); }
 /* the volume slider hides itself on a cramped screen, so close the gap */
 @media (max-width:640px){ .fullscreen-btn{ left:58px; } }
+
+/* ---------- Screenshot button — same chrome, parked past fullscreen; only
+   ever shown mid-run (js/main.js), so it never crowds the main-menu row ---------- */
+.screenshot-btn{ left:206px; }
+.screenshot-btn:active{ transform:scale(.9); }
+.screenshot-btn.flash{ animation:screenshotFlash .4s ease-out; }
+@keyframes screenshotFlash{
+  0%{ box-shadow:0 0 0 0 rgba(255,255,255,.9), var(--shadow-soft); }
+  100%{ box-shadow:0 0 0 14px rgba(255,255,255,0), var(--shadow-soft); }
+}
+@media (max-width:640px){ .screenshot-btn{ left:96px; } }
 
 /* ---------- Volume slider — sits beside the mute button on every screen ---------- */
 .volume-slider{
@@ -146,11 +167,11 @@ button:focus-visible, .class-card:focus-visible{
 }
 
 /* thin themed scrollbars for anything that overflows */
-#mainMenu, .panel{ scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
-#mainMenu::-webkit-scrollbar, .panel::-webkit-scrollbar{ width:8px; height:8px; }
-#mainMenu::-webkit-scrollbar-track{ background:transparent; }
-#mainMenu::-webkit-scrollbar-thumb{ background:var(--border); border-radius:8px; }
-#mainMenu::-webkit-scrollbar-thumb:hover{ background:var(--accent-dim); }
+#mainMenu, .panel, .skilltree-scroll, .hudPanel{ scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+#mainMenu::-webkit-scrollbar, .panel::-webkit-scrollbar, .skilltree-scroll::-webkit-scrollbar, .hudPanel::-webkit-scrollbar{ width:8px; height:8px; }
+#mainMenu::-webkit-scrollbar-track, .skilltree-scroll::-webkit-scrollbar-track, .hudPanel::-webkit-scrollbar-track{ background:transparent; }
+#mainMenu::-webkit-scrollbar-thumb, .skilltree-scroll::-webkit-scrollbar-thumb, .hudPanel::-webkit-scrollbar-thumb{ background:var(--border); border-radius:8px; }
+#mainMenu::-webkit-scrollbar-thumb:hover, .skilltree-scroll::-webkit-scrollbar-thumb:hover, .hudPanel::-webkit-scrollbar-thumb:hover{ background:var(--accent-dim); }
 
 /* ---------- Main Menu ---------- */
 #mainMenu{
@@ -177,12 +198,23 @@ button:focus-visible, .class-card:focus-visible{
 .title span{
   color:var(--accent2);
   text-shadow:0 0 26px rgba(79,209,197,.6), 0 0 56px rgba(79,209,197,.28);
+  animation:titleColorCycle 12s ease-in-out infinite;
 }
 @keyframes titlePulse{
   0%,100%{ filter:brightness(1); }
   50%{ filter:brightness(1.12); }
 }
-@media (prefers-reduced-motion:reduce){ .title{ animation:none; } }
+/* Cycles "CHARGE" through the same DNB neon palette used across the rest of
+   the UI (violet/cyan/gold/red) instead of sitting on one fixed accent
+   color forever — color+text-shadow interpolate together each step so the
+   glow always matches whatever hue is currently showing. */
+@keyframes titleColorCycle{
+  0%,100%{ color:#4fd1c5; text-shadow:0 0 26px rgba(79,209,197,.6), 0 0 56px rgba(79,209,197,.28); }
+  25%{ color:#8b5cf6; text-shadow:0 0 26px rgba(139,92,246,.6), 0 0 56px rgba(139,92,246,.28); }
+  50%{ color:#e3c15b; text-shadow:0 0 26px rgba(227,193,91,.6), 0 0 56px rgba(227,193,91,.28); }
+  75%{ color:#e35b6a; text-shadow:0 0 26px rgba(227,91,106,.6), 0 0 56px rgba(227,91,106,.28); }
+}
+@media (prefers-reduced-motion:reduce){ .title, .title span{ animation:none; } }
 
 .subtitle{ color:var(--muted); margin:0 0 4px; font-size:15px; }
 .lifetime-stats{ color:var(--muted-dim); margin:0 0 4px; font-size:12px; letter-spacing:.2px; }
@@ -190,19 +222,31 @@ button:focus-visible, .class-card:focus-visible{
 .menu-tip{ color:var(--muted-dim); margin:0 0 10px; font-size:11.5px; font-style:italic; max-width:520px; text-align:center; }
 
 .class-grid{
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,190px));
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(158px,196px));
   justify-content:center;
   gap:16px; margin:8px 0;
   max-width:1050px;
 }
 .class-card{
   position:relative; overflow:hidden; isolation:isolate;
+  display:flex; flex-direction:column; align-items:stretch;
   background:linear-gradient(160deg, var(--panel-hi), var(--panel));
   border:2px solid var(--border-soft); border-radius:var(--radius-lg);
-  padding:16px 14px; text-align:center; cursor:pointer;
+  padding:16px 14px 12px; text-align:center; cursor:pointer;
   box-shadow:var(--shadow-soft);
   transition:transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+  /* Staggered entrance (Phase 12 visual pass) — animation-delay is set
+     per-card from JS (ui.js's buildClassSelect, `_cardIndex`), so the grid
+     fills in left-to-right/top-to-bottom instead of every one of 25 cards
+     popping in at once. `both` keeps the card invisible before its own
+     delay elapses instead of flashing at full opacity for one frame first. */
+  animation:classCardIn .45s var(--ease) both;
 }
+@keyframes classCardIn{
+  from{ opacity:0; transform:translateY(10px) scale(.96); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion:reduce){ .class-card{ animation:none; } }
 .class-card::before{
   content:''; position:absolute; inset:0; z-index:1;
   background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.09) 48%, transparent 62%);
@@ -217,12 +261,57 @@ button:focus-visible, .class-card:focus-visible{
   box-shadow:var(--shadow-lift), var(--glow-accent);
 }
 .class-card:active:not(.locked){ transform:translateY(-2px) scale(.99); }
-.class-card canvas{ display:block; margin:0 auto 8px; position:relative; z-index:0; }
+/* Soft radial vignette behind the portrait, so the canvas doesn't just float
+   on the same flat gradient as the rest of the card — a cheap way to give
+   the art a bit more presence without touching the actual pony renderer. */
+.class-card canvas{
+  display:block; margin:0 auto 8px; position:relative; z-index:0;
+  border-radius:50%;
+  background:radial-gradient(closest-side, rgba(255,255,255,.06), transparent 72%);
+}
 .class-card h3{ margin:4px 0; font-size:16px; letter-spacing:.3px; }
-.class-card p{ margin:2px 0; font-size:12px; color:var(--muted); line-height:1.4; }
+.class-card p{ margin:2px 0 8px; font-size:12px; color:var(--muted); line-height:1.4; flex:1 0 auto; }
 .class-card.locked{ opacity:.55; cursor:not-allowed; filter:grayscale(.65); }
 .class-card.locked::after{
   content:'🔒'; position:absolute; top:9px; right:11px; font-size:14px; opacity:.85; z-index:1;
+  transition:transform var(--transition-fast);
+}
+/* Phase 12 visual pass (batch 3) — a locked card previously gave zero
+   feedback on hover; a small lock-jiggle + border tint communicates "not
+   yet" without implying the card is actually clickable the way the
+   unlocked hover treatment (lift + shine sweep) does. */
+.class-card.locked:hover{ border-color:rgba(227,91,106,.4); }
+.class-card.locked:hover::after{ animation:lockJiggle .4s ease-in-out; }
+@keyframes lockJiggle{
+  0%,100%{ transform:rotate(0); }
+  25%{ transform:rotate(-8deg); }
+  75%{ transform:rotate(8deg); }
+}
+
+/* Per-route superboss-defeat indicator — three small pill badges under an
+   unlocked character's description ("A/B n/23", "C n/6", "D n/3"), see
+   buildClassSelect in ui.js. Deliberately tiny/quiet by default (this is a
+   secondary stat, not the headline of the card) and only lights up once
+   there's real progress, so an all-zero row doesn't visually compete with
+   the name/portrait/description above it. */
+.class-superboss-routes{
+  display:flex; justify-content:center; gap:5px; margin-top:auto;
+  padding-top:8px; border-top:1px solid rgba(255,255,255,.06);
+}
+.class-superboss-route{
+  flex:1 1 0; min-width:0; padding:3px 2px; border-radius:6px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border-soft);
+  font-size:9.5px; font-weight:700; letter-spacing:.2px; color:var(--muted-dim);
+  transition:background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  cursor:help;
+}
+.class-superboss-route:hover{ transform:scale(1.06); }
+.class-superboss-route.has-progress{
+  background:rgba(139,92,246,.14); border-color:rgba(139,92,246,.4); color:var(--muted);
+}
+.class-superboss-route.complete{
+  background:rgba(227,193,93,.16); border-color:rgba(227,193,93,.55); color:var(--gold);
+  box-shadow:0 0 8px rgba(227,193,93,.25);
 }
 
 .hint{ color:var(--muted-dim); font-size:12px; margin-top:6px; text-align:center; }
@@ -237,14 +326,25 @@ button:focus-visible, .class-card:focus-visible{
   content:''; flex:1; height:1px;
   background:linear-gradient(90deg, transparent, var(--border), transparent);
 }
-.trophy-row{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; max-width:640px; }
+/* Holds the three per-route groups (A/B, C, D) stacked vertically — replaces
+   the old single flat .trophy-row that used to sit directly under
+   #trophyRow. See buildSuperbossTrophies in ui.js. */
+.trophy-routes{ display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; max-width:640px; }
+.trophy-route-group{ display:flex; flex-direction:column; align-items:center; gap:6px; width:100%; }
+.trophy-route-label{
+  font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--muted-dim); font-weight:700; align-self:flex-start;
+  padding-left:2px;
+}
+.trophy-row{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; width:100%; }
 .trophy{
   width:82px; background:linear-gradient(160deg, var(--panel-hi), var(--panel));
   border:2px solid var(--border-soft); border-radius:var(--radius-md);
   padding:10px 6px; text-align:center; box-shadow:var(--shadow-soft);
   transition:transform var(--transition-base), box-shadow var(--transition-base);
 }
-.trophy:hover{ transform:translateY(-3px); }
+.trophy:hover{ transform:translateY(-3px); box-shadow:var(--shadow-lift), 0 0 16px rgba(139,92,246,.18); }
+.trophy.beaten:hover{ box-shadow:var(--shadow-lift), 0 0 20px rgba(227,193,93,.4); }
 .trophy .icon{ font-size:26px; line-height:1; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
 .trophy .name{ font-size:10px; color:var(--muted); margin-top:5px; line-height:1.3; }
 .trophy .count{ font-size:10px; color:var(--gold); margin-top:2px; font-weight:700; }
@@ -270,6 +370,15 @@ button:focus-visible, .class-card:focus-visible{
 }
 .hud-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 #hearts{ gap:3px; height:24px; align-items:center; }
+/* Mirrors #canvasWrap.low-health's edge-vignette pulse (see ui.js's
+   updateHUD) right at the hearts row itself, where the player's eye
+   actually is when checking remaining HP. */
+#hearts.low-health{ animation:heartsLowPulse 1.4s ease-in-out infinite; }
+@keyframes heartsLowPulse{
+  0%,100%{ filter:drop-shadow(0 0 0 rgba(227,91,106,0)); }
+  50%{ filter:drop-shadow(0 0 6px rgba(227,91,106,.8)); }
+}
+@media (prefers-reduced-motion:reduce){ #hearts.low-health{ animation:none; } }
 
 .hud-resources .res{
   background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
@@ -277,7 +386,7 @@ button:focus-visible, .class-card:focus-visible{
   display:inline-flex; align-items:center; gap:4px;
   transition:border-color var(--transition-base), transform var(--transition-fast);
 }
-.hud-resources .res:hover{ border-color:var(--accent2); }
+.hud-resources .res:hover{ border-color:var(--accent2); transform:translateY(-1px); }
 .hud-resources .res b{ color:var(--ink); font-weight:700; }
 /* a quiet "you're out" cue on the key/bomb counters at 0 — see ui.js updateHUD */
 .hud-resources .res.res-empty{ border-color:rgba(227,91,106,.5); animation:resEmptyPulse 1.8s ease-in-out infinite; }
@@ -286,12 +395,34 @@ button:focus-visible, .class-card:focus-visible{
   0%,100%{ box-shadow:none; }
   50%{ box-shadow:0 0 8px rgba(227,91,106,.4); }
 }
+/* Phase 13 visual pass (batch 1) — a quick gold "bump" on any resource chip
+   whose number just changed (coins/keys/bombs/turrets/minions), triggered
+   from ui.js updateHUD's existing dirty-check blocks. Purely additive: the
+   class is added and removed by JS, same remove/reflow/re-add restart
+   pattern already used for .item-examine-icon.examine-pop. */
+.hud-resources .res.res-bump{ animation:resBump .38s var(--ease); }
+@keyframes resBump{
+  0%{ transform:scale(1); }
+  35%{ transform:scale(1.18); border-color:var(--gold); box-shadow:0 0 10px rgba(227,193,93,.5); }
+  100%{ transform:scale(1); }
+}
+@media (prefers-reduced-motion:reduce){ .hud-resources .res.res-bump{ animation:none; } }
+/* Floor counter gets its own gold flash on floor change — distinct color
+   from the neutral resBump so "you went down a floor" reads at a glance. */
+#resFloor.floor-bump{ animation:floorBump .5s var(--ease); }
+@keyframes floorBump{
+  0%{ color:var(--ink); text-shadow:0 0 12px rgba(227,193,93,.7); }
+  100%{ color:inherit; text-shadow:none; }
+}
+@media (prefers-reduced-motion:reduce){ #resFloor.floor-bump{ animation:none; } }
 
 .active-icon{
   width:36px; height:36px; border-radius:var(--radius-sm); background:var(--panel);
   border:2px solid var(--border-soft); display:flex; align-items:center; justify-content:center;
-  font-size:18px; box-shadow:var(--shadow-soft); transition:border-color var(--transition-base);
+  font-size:18px; box-shadow:var(--shadow-soft);
+  transition:border-color var(--transition-base), transform var(--transition-fast), filter var(--transition-fast);
 }
+.active-icon:hover{ transform:scale(1.08); filter:brightness(1.15); }
 .pill-icon{
   border-radius:50%; margin-left:auto; border-color:rgba(180,140,224,.35);
 }
@@ -305,7 +436,7 @@ button:focus-visible, .class-card:focus-visible{
 }
 .trinket-icon:not(.empty){ border-color:var(--gold); box-shadow:0 0 8px rgba(227,193,93,.35), var(--shadow-soft); }
 .pips{ display:flex; gap:3px; }
-.pip{ width:12px; height:12px; border-radius:3px; background:#33304f; border:1px solid var(--border-soft); transition:background var(--transition-base); }
+.pip{ width:12px; height:12px; border-radius:3px; background:#33304f; border:1px solid var(--border-soft); box-shadow:inset 0 1px 3px rgba(0,0,0,.5); transition:background var(--transition-base), box-shadow var(--transition-base); }
 .pip.full{ background:var(--accent2); box-shadow:0 0 6px var(--accent2); animation:pipGlow 1.9s ease-in-out infinite; }
 @keyframes pipGlow{
   0%,100%{ box-shadow:0 0 6px var(--accent2); }
@@ -314,6 +445,12 @@ button:focus-visible, .class-card:focus-visible{
 /* "this is usable right now" pulse — active item at full charge, or a
    pill/star held in the pocket — see ui.js updateHUD */
 .active-icon.ready-glow{ animation:readyGlow 1.6s ease-in-out infinite; }
+/* Touch action bar (Phase 12 mobile pass) — same ready-glow pulse as the
+   desktop HUD icons above (js/ui/ui.js's updateHUD sets this class on
+   #touchActiveBtn/#touchPillBtn/#touchStarBtn identically to their desktop
+   counterparts), just scoped to .touch-action-btn instead of .active-icon
+   since the two button families don't otherwise share a class. */
+.touch-action-btn.ready-glow{ animation:readyGlow 1.6s ease-in-out infinite; border-color:var(--accent2); }
 @keyframes readyGlow{
   0%,100%{ box-shadow:0 0 8px rgba(79,209,197,.35), var(--shadow-soft); }
   50%{ box-shadow:0 0 16px rgba(79,209,197,.7), var(--shadow-soft); }
@@ -324,7 +461,9 @@ button:focus-visible, .class-card:focus-visible{
   background:var(--panel-glass); border:1px solid var(--border-soft); border-radius:var(--radius-md);
   padding:6px; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
   box-shadow:var(--shadow-soft);
+  transition:border-color var(--transition-base), box-shadow var(--transition-base);
 }
+#minimapWrap:hover{ border-color:var(--accent2); box-shadow:var(--shadow-soft), 0 0 14px rgba(79,209,197,.16); }
 #minimapWrap::before{
   content:'MAP'; display:block; font-size:9px; letter-spacing:2.5px; color:var(--muted-dim);
   text-align:center; margin-bottom:3px; font-weight:600;
@@ -336,9 +475,9 @@ button:focus-visible, .class-card:focus-visible{
   background:var(--panel2); border:1px solid var(--border-soft); color:var(--muted);
   font-size:10px; font-weight:700; line-height:1; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  transition:border-color var(--transition-fast), color var(--transition-fast);
+  transition:border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
-#minimapLegendBtn:hover{ border-color:var(--accent2); color:var(--ink); }
+#minimapLegendBtn:hover{ border-color:var(--accent2); color:var(--ink); transform:scale(1.15); }
 .minimap-legend{
   position:absolute; top:6px; right:calc(100% + 8px);
   width:190px; background:var(--panel-glass); border:1px solid var(--border-soft); border-radius:var(--radius-md);
@@ -364,6 +503,31 @@ button:focus-visible, .class-card:focus-visible{
   0%,100%{ opacity:.55; }
   50%{ opacity:1; }
 }
+/* Phase 13 visual pass (batch 1) — a SHARP one-shot red flash the instant a
+   hit actually lands (entities.js takeDamage stamps player._hitFlashAt; ui.js
+   updateHUD diffs it and retriggers this class the same remove/reflow/re-add
+   way .item-examine-icon.examine-pop restarts). Deliberately separate from
+   .low-health above: that one is an AMBIENT "you're in danger" pulse that
+   loops for as long as you're critical; this one is a single instantaneous
+   "you just got hit" cue that fires on every landed hit regardless of HP. */
+#canvasWrap.hit-flash::before{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:6;
+  background:radial-gradient(ellipse at center, transparent 55%, rgba(227,91,106,.35) 100%);
+  /* BUGFIX (was here from the moment this was added) — no fill-mode meant
+     that the instant this .3s animation finished, the browser snapped the
+     pseudo-element back to its un-animated default (opacity:1, since no
+     opacity was set outside the keyframes) instead of holding the animation's
+     own 100%{opacity:0} end state. That made the overlay SNAP BACK TO FULLY
+     VISIBLE after the very first hit taken, and it never got a second
+     opacity change to hide it again — a permanent stuck-red screen from the
+     first hit of every run onward. `forwards` makes it hold opacity:0. */
+  animation:hitFlash .3s ease-out forwards;
+}
+@keyframes hitFlash{
+  0%{ opacity:1; }
+  100%{ opacity:0; }
+}
+@media (prefers-reduced-motion:reduce){ #canvasWrap.hit-flash::before{ animation:none; display:none; } }
 #game{
   background:#000; border-radius:6px;
   box-shadow:0 0 0 1px var(--border-soft), 0 0 50px rgba(139,92,246,.16), var(--shadow-lift);
@@ -375,15 +539,26 @@ button:focus-visible, .class-card:focus-visible{
      blocky. Bilinear keeps the curves reading as curves. The matching
      in-canvas decision (ctx.imageSmoothingEnabled) is set in render.js. */
   image-rendering:auto;
+  /* Phase 13 visual pass — a crosshair cursor over the play field reads as
+     "this is an aiming surface" at a glance; the default arrow doesn't. */
+  cursor:crosshair;
 }
 #roomBanner{
   position:absolute; top:10px; left:50%;
   transform:translate(-50%,-8px);
-  font-size:19px; letter-spacing:3px; font-weight:700; color:var(--gold);
-  text-shadow:0 2px 10px rgba(0,0,0,.9), var(--glow-gold);
+  font-size:19px; letter-spacing:3px; font-weight:700;
+  /* Phase 12 visual pass — `--banner-color` is set inline per room type
+     (ui.js's showRoomBanner, from the SAME roomTypeColor() the minimap
+     uses); an unset/empty value is invalid for `color`, which is exactly
+     the trigger CSS custom properties use to fall back to var()'s second
+     argument, so a call with no room type (or an old call site that never
+     learns about this) still renders the original flat gold unchanged. */
+  color:var(--banner-color, var(--gold));
+  text-shadow:0 2px 10px rgba(0,0,0,.9), 0 0 18px var(--banner-color, rgba(227,193,93,.4));
   opacity:0; pointer-events:none;
   padding:4px 20px; border-radius:999px; background:rgba(8,7,13,.4);
-  transition:opacity .5s var(--ease), transform .5s var(--ease);
+  border:1px solid color-mix(in srgb, var(--banner-color, var(--gold)) 45%, transparent);
+  transition:opacity .5s var(--ease), transform .5s var(--ease), color .3s var(--ease), border-color .3s var(--ease);
 }
 #roomBanner.show{ opacity:1; transform:translate(-50%,0); }
 #toast{
@@ -394,9 +569,14 @@ button:focus-visible, .class-card:focus-visible{
   max-width:80%; text-align:center;
   backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
   box-shadow:var(--shadow-soft);
-  transition:opacity .35s var(--ease), transform .35s var(--ease);
+  transition:opacity .35s var(--ease), transform .35s var(--ease), border-color .2s var(--ease);
 }
 #toast.show{ opacity:1; transform:translate(-50%,0); }
+/* Phase 12 visual pass — optional per-toast tint (ui.js's toast(msg, long,
+   kind)); an untagged toast keeps the original plain look untouched. */
+#toast.toast-good{ border-color:rgba(127,214,106,.5); box-shadow:var(--shadow-soft), 0 0 14px rgba(127,214,106,.18); }
+#toast.toast-bad{ border-color:rgba(227,91,106,.5); box-shadow:var(--shadow-soft), 0 0 14px rgba(227,91,106,.18); }
+#toast.toast-info{ border-color:rgba(79,209,197,.5); box-shadow:var(--shadow-soft), 0 0 14px rgba(79,209,197,.18); }
 
 /* ---------- item/trinket/familiar examination tooltip (BoI "external item
    descriptions"-style) — shows while standing near an unclaimed pedestal ---------- */
@@ -412,6 +592,15 @@ button:focus-visible, .class-card:focus-visible{
 }
 #itemExamine.show{ opacity:1; transform:translate(-50%,0); }
 .item-examine-icon{ font-size:26px; flex:0 0 auto; line-height:1; }
+/* `.examine-pop` is added/removed by ui.js's showItemExamine only when the
+   examined pedestal actually changes (not every frame — see that function's
+   own comment), so this plays once per new item rather than looping. */
+.item-examine-icon.examine-pop{ animation:itemExamineIconIn .3s var(--ease) both; }
+@keyframes itemExamineIconIn{
+  from{ opacity:0; transform:scale(.5) rotate(-15deg); }
+  to{ opacity:1; transform:scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion:reduce){ .item-examine-icon.examine-pop{ animation:none; } }
 .item-examine-text{ min-width:0; text-align:left; }
 .item-examine-name{ font-weight:700; font-size:13px; color:var(--ink); }
 .item-examine-quality{ font-size:11px; color:var(--gold); margin:1px 0; letter-spacing:.5px; }
@@ -441,8 +630,9 @@ button:focus-visible, .class-card:focus-visible{
 .familiar-chip .chip-count{
   position:absolute; right:-3px; bottom:-3px;
   font-size:8px; font-weight:700; line-height:1; color:var(--ink);
-  background:var(--panel); border:1px solid var(--border-soft); border-radius:999px;
-  padding:1px 3px;
+  background:linear-gradient(160deg, var(--accent), var(--accent-dim));
+  border:1px solid rgba(255,255,255,.25); border-radius:999px;
+  padding:1px 3px; box-shadow:0 1px 3px rgba(0,0,0,.4);
 }
 
 /* synergy badges — 5 fixed icons (see index.html/ui.js updateHUD), dim by
@@ -460,6 +650,17 @@ button:focus-visible, .class-card:focus-visible{
   opacity:1; filter:none; border-color:var(--accent2);
   box-shadow:var(--glow-accent2), var(--shadow-soft);
 }
+/* One-shot flash the instant a synergy's requirement is first met mid-run
+   (ui.js's updateHUD, `.just-activated`) — a quick bright ring-burst,
+   distinct from the steady .active glow above, so newly meeting a synergy
+   reads as an event rather than silently blending into an already-lit
+   badge. */
+.synergy-badge.just-activated{ animation:synergyJustActivated .6s ease-out; }
+@keyframes synergyJustActivated{
+  0%{ box-shadow:0 0 0 0 rgba(79,209,197,.9); transform:scale(1.4); }
+  100%{ box-shadow:var(--glow-accent2), var(--shadow-soft); transform:scale(1); }
+}
+@media (prefers-reduced-motion:reduce){ .synergy-badge.just-activated{ animation:none; } }
 
 /* ---------- side HUD panels (#leftPanel / #rightPanel) — absolutely
    positioned in the idle space either side of the canvas inside #canvasWrap
@@ -518,8 +719,8 @@ button:focus-visible, .class-card:focus-visible{
   animation:overlayFade .3s var(--ease) both;
 }
 @keyframes overlayFade{ from{ opacity:0; } to{ opacity:1; } }
-.overlay h2, .overlay p, .overlay button{ animation:overlayRise .45s var(--ease) both; }
-.overlay p{ animation-delay:.05s; }
+.overlay h2, .overlay p, .overlay button, .overlay .pause-keybinds{ animation:overlayRise .45s var(--ease) both; }
+.overlay p, .overlay .pause-keybinds{ animation-delay:.05s; }
 .overlay button{ animation-delay:.1s; }
 @keyframes overlayRise{
   from{ opacity:0; transform:translateY(14px) scale(.97); }
@@ -531,9 +732,81 @@ button:focus-visible, .class-card:focus-visible{
 .overlay h2{ font-size:32px; margin:0; letter-spacing:1px; text-shadow:0 0 20px rgba(139,92,246,.5); }
 #gameOverScreen h2{ color:var(--red); text-shadow:0 0 22px rgba(227,91,106,.55); }
 #winScreen h2{ color:var(--gold); text-shadow:0 0 22px rgba(227,193,93,.55); }
+
+/* ---------- Game Over / Win — bespoke atmosphere beyond the shared
+   .overlay chrome (Phase 12 visual pass). Both are pure CSS: a tinted
+   radial wash behind the panel content, plus a slow drifting field of
+   embers (defeat) or motes (victory) on ::before, so each ending READS as
+   a distinct moment rather than the same dark backdrop with a different
+   headline color. Purely decorative — pointer-events:none, z-index below
+   the actual h2/p/button content (which the .overlay rules already animate
+   in on top), and skipped outright under reduced motion like every other
+   ambient animation in this file. ---------- */
+#gameOverScreen{
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(227,91,106,.16), transparent 62%),
+    rgba(6,5,10,.82);
+}
+#winScreen{
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(227,193,93,.18), transparent 62%),
+    rgba(6,5,10,.82);
+}
+#gameOverScreen::before, #winScreen::before{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background-repeat:repeat; background-size:220px 220px;
+}
+#gameOverScreen::before{
+  background-image:
+    radial-gradient(2px 2px at 15% 30%, rgba(227,91,106,.5), transparent),
+    radial-gradient(1.5px 1.5px at 68% 72%, rgba(227,91,106,.4), transparent),
+    radial-gradient(1.5px 1.5px at 40% 88%, rgba(227,91,106,.35), transparent),
+    radial-gradient(1px 1px at 85% 20%, rgba(227,91,106,.3), transparent);
+  animation:emberDrift 9s linear infinite;
+}
+#winScreen::before{
+  background-image:
+    radial-gradient(2px 2px at 20% 25%, rgba(227,193,93,.6), transparent),
+    radial-gradient(1.5px 1.5px at 72% 60%, rgba(227,193,93,.5), transparent),
+    radial-gradient(1.5px 1.5px at 45% 85%, rgba(255,255,255,.4), transparent),
+    radial-gradient(1px 1px at 88% 35%, rgba(227,193,93,.4), transparent);
+  animation:emberDrift 12s linear infinite reverse;
+}
+@keyframes emberDrift{
+  0%{ background-position:0 0; }
+  100%{ background-position:-220px -260px; }
+}
+#gameOverScreen h2, #gameOverScreen p, #gameOverScreen button,
+#winScreen h2, #winScreen p, #winScreen button{ position:relative; z-index:1; }
+@media (prefers-reduced-motion:reduce){
+  #gameOverScreen::before, #winScreen::before{ animation:none; }
+}
 .overlay p{ color:var(--muted); text-align:center; max-width:440px; line-height:1.55; }
 #pauseScreen .pause-equipped{ font-size:12px; color:var(--accent2); margin-top:-4px; }
 .pause-equipped:empty{ display:none; }
+
+/* ---------- Pause screen keybind reference (Phase 12 visual pass) —
+   replaces the old single run-on line of plain text with a proper grid of
+   key-cap + label pairs, matching the visual language a keyboard shortcut
+   deserves rather than reading as an undifferentiated wall of text. ---------- */
+.pause-keybinds{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+  gap:6px 14px; width:100%; max-width:460px; margin:2px 0 4px;
+}
+.pause-keybind{
+  display:flex; align-items:center; gap:8px;
+  font-size:12.5px; color:var(--muted);
+  padding:2px 4px; border-radius:6px;
+  transition:background var(--transition-fast), color var(--transition-fast);
+}
+.pause-keybind:hover{ background:rgba(255,255,255,.05); color:var(--ink); }
+.pause-keybind kbd{
+  flex:0 0 auto; min-width:26px; text-align:center;
+  background:linear-gradient(180deg, var(--panel-hi), var(--panel));
+  border:1px solid var(--border-soft); border-bottom-width:2px;
+  border-radius:5px; padding:2px 7px; font-size:11px; font-weight:700;
+  color:var(--ink); box-shadow:var(--shadow-soft);
+}
 .overlay button{
   background:linear-gradient(160deg, var(--accent), #6d3fc9); color:#fff; border:none;
   padding:11px 26px; border-radius:var(--radius-md); font-size:15px; font-weight:600; cursor:pointer;
@@ -542,6 +815,14 @@ button:focus-visible, .class-card:focus-visible{
 }
 .overlay button:hover{ filter:brightness(1.15); transform:translateY(-2px); box-shadow:var(--shadow-lift); }
 .overlay button:active{ transform:translateY(0); }
+/* Phase 12 visual pass (batch 3) — every pause-screen button used to share
+   one identical purple-gradient look regardless of what it actually does;
+   Quit is destructive (loses the current run, per its own confirm()
+   dialog) and deserves to read as the least-reached-for option in the row,
+   not visually identical to Resume/Achievements/Bestiary/Skill Tree. */
+#quitBtn{ background:var(--panel); color:var(--muted); border:1px solid var(--border-soft); box-shadow:none; }
+#quitBtn:hover{ background:linear-gradient(160deg, var(--red), #a83040); color:#fff; filter:none; }
+#resumeBtn{ box-shadow:var(--shadow-soft), var(--glow-accent); }
 
 /* ---------- Main menu: open-achievements / open-bestiary buttons ---------- */
 .menu-btn-row{ display:flex; gap:12px; margin-top:4px; flex-wrap:wrap; justify-content:center; }
@@ -574,7 +855,7 @@ button:focus-visible, .class-card:focus-visible{
   transition:border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 .achv-filter button:hover{ border-color:var(--accent2); color:var(--ink); }
-.achv-filter button.active{ background:var(--accent-dim); border-color:var(--accent); color:var(--ink); }
+.achv-filter button.active{ background:var(--accent-dim); border-color:var(--accent); color:var(--ink); box-shadow:0 0 12px rgba(139,92,246,.3); }
 .achv-list{
   width:100%; max-width:760px; display:flex; flex-direction:column; gap:4px;
   animation:overlayRise .45s var(--ease) both; animation-delay:.05s;
@@ -590,9 +871,44 @@ button:focus-visible, .class-card:focus-visible{
   background:linear-gradient(160deg, var(--panel-hi), var(--panel));
   border:1px solid var(--border-soft); border-radius:var(--radius-md);
   padding:9px 14px; opacity:.55; filter:grayscale(.5);
-  transition:opacity var(--transition-base), filter var(--transition-base), border-color var(--transition-base);
+  transition:opacity var(--transition-base), filter var(--transition-base), border-color var(--transition-base), transform var(--transition-fast), box-shadow var(--transition-base);
 }
 .achv-row.done{ opacity:1; filter:none; border-color:rgba(227,193,93,.35); box-shadow:0 0 14px rgba(227,193,93,.12); }
+/* Phase 13 visual pass (batch 1) — a light staggered rise-in the first time
+   a category's row list paints, so opening the achievements panel doesn't
+   just pop a dense wall of rows into place all at once. Capped at the first
+   12 rows per list (nth-child) — a category can run past that, but by then
+   the eye has already caught the panel's overall rhythm, so no visible loss. */
+.achv-grid .achv-row{ animation:achvRowIn .35s var(--ease) both; }
+.achv-grid .achv-row:nth-child(1){ animation-delay:0s; }
+.achv-grid .achv-row:nth-child(2){ animation-delay:.03s; }
+.achv-grid .achv-row:nth-child(3){ animation-delay:.06s; }
+.achv-grid .achv-row:nth-child(4){ animation-delay:.09s; }
+.achv-grid .achv-row:nth-child(5){ animation-delay:.12s; }
+.achv-grid .achv-row:nth-child(6){ animation-delay:.15s; }
+.achv-grid .achv-row:nth-child(7){ animation-delay:.18s; }
+.achv-grid .achv-row:nth-child(8){ animation-delay:.21s; }
+.achv-grid .achv-row:nth-child(9){ animation-delay:.24s; }
+.achv-grid .achv-row:nth-child(10){ animation-delay:.27s; }
+.achv-grid .achv-row:nth-child(11){ animation-delay:.3s; }
+.achv-grid .achv-row:nth-child(12){ animation-delay:.33s; }
+@keyframes achvRowIn{
+  /* opacity is deliberately NOT animated here — .achv-row/.achv-row.done
+     above already use opacity to mean locked-vs-done, and an animation
+     fill-mode:both would freeze whatever value 'to' set, permanently
+     overriding that. Only the entrance motion (translateY) is animated. */
+  from{ transform:translateY(6px); }
+  to{ transform:translateY(0); }
+}
+@media (prefers-reduced-motion:reduce){ .achv-grid .achv-row{ animation:none; } }
+/* Phase 12 visual pass — these rows are read-only (no click handler), so
+   this is purely "help the eye track which row the cursor is over" in a
+   dense scrolling list (achievements/bestiary/music-test all reuse this
+   class), not an affordance for something clickable. Subtle on purpose:
+   a done row already reads as gold, so its hover only deepens what's
+   already there rather than fighting it. */
+.achv-row:hover{ border-color:var(--accent2); transform:translateX(2px); }
+.achv-row.done:hover{ border-color:var(--gold); box-shadow:0 0 18px rgba(227,193,93,.22); }
 .achv-icon{ font-size:22px; flex:0 0 auto; width:30px; text-align:center; }
 .achv-text{ min-width:0; flex:1; }
 .achv-name{ font-size:13.5px; font-weight:700; }
@@ -600,21 +916,629 @@ button:focus-visible, .class-card:focus-visible{
 .achv-desc{ font-size:12px; color:var(--muted); margin-top:1px; line-height:1.4; }
 .achv-reward{ font-size:11px; color:var(--accent2); margin-top:2px; }
 
-/* ---------- Bestiary panel — reuses everything above (.achv-summary/
-   .achv-filter/.achv-list/.achv-category/.achv-grid/.achv-row/.achv-icon/
-   .achv-text/.achv-name/.achv-desc/.achv-reward), just a couple of its own
-   additions for the things Achievements never needed: a plain colored dot
-   in place of an emoji glyph (enemies/objects/pills have no icon of their
-   own), and a one-off note paragraph above the Pills tab ---------- */
-.achv-icon.best-dot{
+/* ---------- Music Test panel — reuses .achv-summary/.achv-list/.achv-row/
+   .achv-icon/.achv-text/.achv-name/.achv-desc from the achievements panel
+   above (see ui/music-test.js); only two rules of its own: the row
+   highlight for whichever track is currently previewing, and the per-row
+   Play/Stop button (achievement rows have no interactive control of their
+   own to borrow a style from). ---------- */
+.music-test-row.playing{ border-color:var(--accent2); box-shadow:0 0 14px rgba(79,209,197,.18); }
+.music-test-row.playing .achv-name{ color:var(--accent2); }
+.music-test-btn{
+  flex:0 0 auto; background:var(--panel); color:var(--ink); border:1px solid var(--border-soft);
+  padding:6px 14px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer;
+  transition:border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+.music-test-btn:hover{ border-color:var(--accent2); background:var(--accent-dim); transform:translateY(-1px); }
+.music-test-row.playing .music-test-btn{ border-color:var(--accent2); }
+
+/* ---------- Bestiary panel (Phase 20 revamp) — used to reuse the
+   Achievements panel's stacked .achv-row list wholesale; now has its own
+   card-grid classes below instead (.achv-category is still reused for the
+   top-level Enemies/Bosses/Superbosses/etc headers — a plain section
+   heading, nothing card-specific about it). #bestiaryList still carries
+   .achv-list too (for .achv-summary/.achv-filter tab-button styling and
+   the overlay's shared entrance animation), just widened past its 760px
+   cap below since a card grid wants more horizontal room than a single
+   column of rows ever did. ---------- */
+#bestiaryList{ max-width:1180px; }
+.best-grid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
+  gap:10px; width:100%;
+}
+.best-card{
+  display:flex; flex-direction:column; gap:6px;
+  background:linear-gradient(160deg, var(--panel-hi), var(--panel));
+  border:1px solid var(--border-soft); border-radius:var(--radius-md);
+  padding:10px 12px; opacity:.55; filter:grayscale(.5);
+  transition:opacity var(--transition-base), filter var(--transition-base), border-color var(--transition-base), transform var(--transition-fast), box-shadow var(--transition-base);
+}
+.best-card.done{ opacity:1; filter:none; border-color:rgba(227,193,93,.35); box-shadow:0 0 14px rgba(227,193,93,.12); }
+.best-card:hover{ border-color:var(--accent2); transform:translateY(-2px); }
+.best-card.done:hover{ border-color:var(--gold); box-shadow:0 0 18px rgba(227,193,93,.22); }
+.best-grid .best-card{ animation:achvRowIn .35s var(--ease) both; }
+.best-grid .best-card:nth-child(1){ animation-delay:0s; }
+.best-grid .best-card:nth-child(2){ animation-delay:.03s; }
+.best-grid .best-card:nth-child(3){ animation-delay:.06s; }
+.best-grid .best-card:nth-child(4){ animation-delay:.09s; }
+.best-grid .best-card:nth-child(5){ animation-delay:.12s; }
+.best-grid .best-card:nth-child(6){ animation-delay:.15s; }
+.best-grid .best-card:nth-child(7){ animation-delay:.18s; }
+.best-grid .best-card:nth-child(8){ animation-delay:.21s; }
+@media (prefers-reduced-motion:reduce){ .best-grid .best-card{ animation:none; } }
+.best-card-head{ display:flex; align-items:center; gap:10px; }
+.best-card-icon{ font-size:24px; flex:0 0 auto; width:32px; text-align:center; }
+.best-card-icon.best-dot{
   width:20px; height:20px; margin:0 auto; border-radius:50%;
   box-shadow:0 0 6px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.25);
 }
-.bestiary-note{
-  font-size:12px; color:var(--muted); line-height:1.5; max-width:760px;
-  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius-md);
-  padding:9px 14px; margin:0 0 10px;
+.best-card-name{ font-size:13.5px; font-weight:700; min-width:0; }
+.best-card.done .best-card-name{ color:var(--gold); }
+.best-card-desc{ font-size:11.5px; color:var(--muted); line-height:1.4; }
+.best-card-chips{ display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+.best-chip{
+  font-size:10px; line-height:1.6; padding:1px 7px; border-radius:999px;
+  background:rgba(255,255,255,.05); border:1px solid var(--border-soft); color:var(--muted);
+  white-space:nowrap;
 }
+.best-card.done .best-chip{ color:var(--ink); }
+.best-card-tally{ font-size:10.5px; color:var(--accent2); margin-top:auto; padding-top:3px; }
+/* stage/route sub-groups nested under an Enemies/Bosses/Superbosses category
+   header — a thin left rail groups its cards visually without a full boxed
+   panel (which would fight the card grid's own borders) */
+.best-stage-group{ border-left:2px solid var(--border-soft); padding-left:10px; margin-bottom:4px; }
+.best-subcategory{
+  font-size:10.5px; letter-spacing:1.8px; text-transform:uppercase; color:var(--muted-dim);
+  margin:8px 0 6px 2px; font-weight:600; opacity:.85;
+}
+/* Phase 8a — per-card mastery tier badge (copper/silver/gold/platinum), a
+   tiny glyph tucked after the entry name. Its colour is set inline from
+   BESTIARY_TIER_COLORS (achievements/bestiary-tiers.js). */
+.best-tier{ font-size:11px; vertical-align:middle; margin-left:2px; cursor:default; filter:drop-shadow(0 0 3px currentColor); }
+.bestiary-note{
+  font-size:12px; color:var(--muted); line-height:1.5; max-width:100%;
+  background:var(--panel); border:1px solid var(--border-soft); border-left:3px solid var(--accent2);
+  border-radius:var(--radius-md); padding:9px 14px; margin:0 0 10px;
+}
+
+/* ---------- Skill Tree panel — reuses everything the Achievements/Bestiary
+   panels already define (.achv-summary/.achv-list/.achv-grid/.achv-row/
+   .achv-text/.achv-name/.achv-desc); only the buyable-row highlight and the
+   inline "Unlock" button (sized for a row, not a full-width overlay button
+   like Close) are new. See achievements/skilltree.js's buildSkillTreePanel. */
+.skill-row.skill-buyable{ border-color:rgba(139,92,246,.55); box-shadow:0 0 14px rgba(139,92,246,.18); }
+.skill-buy-btn{
+  flex:0 0 auto; margin-top:0; padding:6px 14px; font-size:12.5px;
+  background:linear-gradient(160deg, var(--accent), #6d3fc9); color:#fff; border:none;
+  border-radius:var(--radius-md); font-weight:600; cursor:pointer; box-shadow:var(--shadow-soft);
+  transition:transform var(--transition-fast), filter var(--transition-fast);
+}
+.skill-buy-btn:hover{ filter:brightness(1.15); transform:translateY(-2px); }
+.skill-buy-btn:active{ transform:translateY(0); }
+
+/* ---------- Skill Tree panel — visual tree (replaces the flat-list render
+   above; the flat-list classes above are dead code kept only in case a
+   future pass wants a fallback). `.skilltree-scroll` is the scroll viewport
+   (both axes — the tree can get wider than #skillTreeList's inherited
+   .achv-list max-width once later phases add branching content, and .achv-
+   list itself stays vertical-only since achievements/bestiary share it and
+   shouldn't gain a horizontal scrollbar). `.skilltree-canvas` is sized to
+   the full computed layout bounding box in achievements/skilltree.js's
+   buildSkillTreePanel/computeSkillTreeLayout, and is positioned entirely via
+   a single CSS `transform:translate(panX,panY) scale(zoom)` applied by that
+   same function's wheel-zoom (zoom-toward-cursor, 0.4x–2x) and
+   mousedown/mousemove drag-to-pan handlers — .skilltree-scroll is
+   overflow:hidden (no native scrollbars at all; see the overlay-specific
+   override below) and .skilltree-canvas is absolutely positioned at (0,0)
+   inside it so translate/scale fully control what's visible, with no
+   competing native-scroll offset to double up against. */
+.skilltree-scroll{
+  position:relative; width:100%; max-width:100%; overflow-x:auto; overflow-y:visible;
+  animation:overlayRise .45s var(--ease) both; animation-delay:.05s;
+  /* Subtle dotted grid + soft radial vignette behind the tree, purely
+     decorative — gives panning/zooming a sense of moving through real space
+     instead of an empty flat-black canvas. Fixed background (not tied to
+     canvas transform) so it doesn't itself pan/zoom with the tree, which
+     reads better than a swimming grid at high zoom. */
+  background-color:#0c0a14;
+  background-image:
+    radial-gradient(ellipse at 50% 40%, rgba(139,92,246,.10), transparent 65%),
+    radial-gradient(circle, rgba(255,255,255,.06) 1px, transparent 1.4px);
+  background-size:auto, 26px 26px;
+}
+.skilltree-canvas{ position:absolute; top:0; left:0; transform-origin:0 0; }
+.skilltree-svg{ position:absolute; inset:0; pointer-events:none; }
+.skilltree-edge{ stroke:var(--border); stroke-width:2; }
+.skilltree-edge.owned{ stroke:var(--gold); stroke-width:2.5; opacity:.8; }
+/* An edge whose CHILD is a cursed node — a visual "warning sign" one hop
+   before the player reaches the drawback itself, visible even zoomed out
+   far enough that the cursed node's own spiked shape isn't legible yet. */
+.skilltree-edge.to-cursed{ stroke:#c94a4a; stroke-dasharray:5 4; }
+.skilltree-edge.to-cursed.owned{ stroke:#ff6b6b; opacity:.9; }
+/* The node button itself is a true fixed-size circle (equal width/height,
+   set inline from SKILL_TREE_NODE_SIZE in skilltree.js) showing only a
+   compact one-letter glyph. The node NAME lives outside the circle as
+   .skilltree-node-label — a separate absolutely-positioned child pinned
+   below it (position:absolute + overflow:visible on the circle itself, so
+   the label paints under the circle unclipped) — since most names are far
+   too long to fit legibly inside a 74px circle. */
+.skilltree-node{
+  position:absolute; display:flex; align-items:center; justify-content:center;
+  border-radius:50%; text-align:center; padding:0; box-sizing:border-box;
+  background:linear-gradient(160deg, var(--panel-hi), var(--panel));
+  border:2px solid var(--border-soft); color:var(--ink); font-family:inherit;
+  transition:transform var(--transition-fast), filter var(--transition-fast),
+    border-color var(--transition-base), box-shadow var(--transition-base);
+}
+.skilltree-node-glyph{ font-size:20px; font-weight:800; line-height:1; pointer-events:none; }
+.skilltree-node-label{
+  position:absolute; top:100%; left:50%; margin-top:6px;
+  transform:translateX(-50%); width:112px;
+  font-size:10.5px; font-weight:700; line-height:1.2;
+  overflow-wrap:break-word; white-space:normal; pointer-events:none;
+}
+.skilltree-node.owned{
+  border-color:rgba(227,193,93,.65); box-shadow:0 0 16px rgba(227,193,93,.25);
+  cursor:default;
+}
+.skilltree-node.owned .skilltree-node-label{ color:var(--gold); }
+.skilltree-node.buyable{
+  border-color:var(--accent); box-shadow:0 0 16px rgba(139,92,246,.4);
+  cursor:pointer; animation:skillNodePulse 1.8s ease-in-out infinite;
+}
+.skilltree-node.buyable:hover{ filter:brightness(1.2); transform:scale(1.06); }
+/* "locked" (unrendered/hidden-by-fog) nodes no longer exist in the DOM at
+   all — see isVisible() in skilltree.js — so this class is now only the
+   revealed-but-can't-afford-it-yet state: visible (parent owned) but the
+   player doesn't have enough points. Distinct from the old blanket "locked"
+   look so it doesn't read the same as "not reached yet". */
+.skilltree-node.unaffordable{ opacity:.55; filter:grayscale(.35); cursor:default; }
+.skilltree-node.unaffordable .skilltree-node-cost{ background:var(--danger,#e85d5d); color:#fff; }
+@keyframes skillNodePulse{
+  0%,100%{ box-shadow:0 0 16px rgba(139,92,246,.4); }
+  50%{ box-shadow:0 0 24px rgba(139,92,246,.7); }
+}
+
+/* Filter bar (#skillTreeFilterBar) — a non-matching node stays exactly
+   where it is (layout/edges unaffected) but fades hard, so switching
+   filters reads as "everything else steps back" rather than the tree
+   reflowing or nodes vanishing. Deliberately less extreme than
+   .unaffordable's own dimming so the two states stay visually distinct
+   when they overlap (an unaffordable node under an active "Owned" filter
+   should look UNAMBIGUOUSLY dimmed-by-filter, not just its normal self). */
+.skilltree-node.dimmed{ opacity:.16; filter:grayscale(.6); pointer-events:none; }
+.skilltree-node.dimmed .skilltree-node-label{ opacity:.5; }
+
+/* Capstone nodes (achievements/skilltree-capstones.js) — one per character,
+   cost 3, always the deepest leaf of that character's tree. A wider
+   double-ring plus a crown glyph (set in JS) marks it as a real destination
+   rather than just another stop along the way. Stacks with
+   .owned/.buyable/.unaffordable exactly like .cursed does. */
+.skilltree-node.capstone{
+  border-width:3px; border-color:#e3c15d;
+  box-shadow:0 0 0 4px rgba(227,193,93,.18), 0 0 18px rgba(227,193,93,.35);
+}
+.skilltree-node.capstone .skilltree-node-glyph{ font-size:24px; }
+.skilltree-node.capstone.buyable{
+  box-shadow:0 0 0 4px rgba(227,193,93,.22), 0 0 22px rgba(227,193,93,.6);
+  animation:skillNodePulseCapstone 1.8s ease-in-out infinite;
+}
+.skilltree-node.capstone .skilltree-node-label{ color:#e3c15d; font-weight:800; }
+@keyframes skillNodePulseCapstone{
+  0%,100%{ box-shadow:0 0 0 4px rgba(227,193,93,.22), 0 0 18px rgba(227,193,93,.55); }
+  50%{ box-shadow:0 0 0 6px rgba(227,193,93,.3), 0 0 28px rgba(227,193,93,.85); }
+}
+/* Owned capstones get a slow, much subtler idle shimmer instead of going
+   fully static — a small reward-for-reaching-it flourish, distinct from the
+   more urgent .buyable pulse (which means "come spend a point here", not
+   "you already finished this"). */
+.skilltree-node.capstone.owned{
+  animation:skillNodeCapstoneShimmer 4s ease-in-out infinite;
+}
+@keyframes skillNodeCapstoneShimmer{
+  0%,100%{ box-shadow:0 0 0 4px rgba(227,193,93,.18), 0 0 16px rgba(227,193,93,.3); }
+  50%{ box-shadow:0 0 0 5px rgba(227,193,93,.26), 0 0 22px rgba(227,193,93,.5); }
+}
+
+/* Ascension nodes (achievements/skilltree-ascensions.js) — one tier past a
+   capstone, cost 5, the single most expensive node in the game. Distinct
+   "electric" cyan/violet palette (vs. the capstone's gold) so a build's true
+   endpoint reads as its own tier at a glance, not just a bigger capstone. */
+.skilltree-node.ascension{
+  border-width:3px; border-color:#4fd8ff;
+  box-shadow:0 0 0 4px rgba(79,216,255,.2), 0 0 20px rgba(139,92,246,.5);
+}
+.skilltree-node.ascension .skilltree-node-glyph{ font-size:24px; }
+.skilltree-node.ascension.buyable{
+  box-shadow:0 0 0 4px rgba(79,216,255,.26), 0 0 26px rgba(139,92,246,.75);
+  animation:skillNodePulseAscension 1.6s ease-in-out infinite;
+}
+.skilltree-node.ascension .skilltree-node-label{ color:#4fd8ff; font-weight:800; }
+@keyframes skillNodePulseAscension{
+  0%,100%{ box-shadow:0 0 0 4px rgba(79,216,255,.24), 0 0 20px rgba(139,92,246,.6); }
+  50%{ box-shadow:0 0 0 7px rgba(79,216,255,.34), 0 0 32px rgba(139,92,246,.95); }
+}
+.skilltree-node.ascension.owned{
+  animation:skillNodeAscensionShimmer 3.4s ease-in-out infinite;
+}
+@keyframes skillNodeAscensionShimmer{
+  0%,100%{ box-shadow:0 0 0 4px rgba(79,216,255,.18), 0 0 16px rgba(139,92,246,.35); }
+  50%{ box-shadow:0 0 0 6px rgba(79,216,255,.28), 0 0 26px rgba(139,92,246,.6); }
+}
+
+/* Cursed nodes — permanent-drawback nodes (see the `cursed:true` convention
+   in skilltree-characters-3.js onward). Rendered as a jagged 14-point spiked
+   disc instead of a plain circle, with a blood-red palette, so a drawback
+   node is unmistakable from across a zoomed-out view, well before the
+   player is close enough to read its tooltip. Stacks with
+   .owned/.buyable/.unaffordable (a cursed node can be in any of those three
+   states — only the shape+palette is cursed-specific).
+   IMPORTANT: the clip-path lives on a ::before pseudo-element, NOT on
+   .skilltree-node itself — clip-path clips an element's entire painted
+   subtree including out-of-flow descendants, and .skilltree-node-label
+   (position:absolute, top:100%) and .skilltree-node-cost (top:-6px) both
+   paint outside the node's own 0%-100% box, so clipping the button directly
+   would silently delete the label and cost badge on every cursed node. The
+   pseudo-element (content:''; inset:0) fills exactly the button's box and
+   paints first (::before is first in paint order), so the glyph/cost/label
+   — real children, painted after — sit visually on top of it, unclipped. */
+.skilltree-node.cursed{ background:transparent; border-color:transparent; }
+.skilltree-node.cursed::before{
+  content:''; position:absolute; inset:0; box-sizing:border-box;
+  clip-path: polygon(50.0% 0.0%, 57.6% 16.9%, 71.7% 5.0%, 71.2% 23.4%, 89.1% 18.8%, 80.6% 35.2%, 98.7% 38.9%, 84.0% 50.0%, 98.7% 61.1%, 80.6% 64.8%, 89.1% 81.2%, 71.2% 76.6%, 71.7% 95.0%, 57.6% 83.1%, 50.0% 100.0%, 42.4% 83.1%, 28.3% 95.0%, 28.8% 76.6%, 10.9% 81.2%, 19.4% 64.8%, 1.3% 61.1%, 16.0% 50.0%, 1.3% 38.9%, 19.4% 35.2%, 10.9% 18.8%, 28.8% 23.4%, 28.3% 5.0%, 42.4% 16.9%);
+  background:linear-gradient(160deg, #6e1c1c, #2a0808);
+  border:2px solid #ff4d4d;
+}
+.skilltree-node.cursed.owned{ box-shadow:0 0 16px rgba(255,77,77,.4); }
+.skilltree-node.cursed.buyable{
+  box-shadow:0 0 16px rgba(255,77,77,.55);
+  animation:skillNodePulseCursed 1.8s ease-in-out infinite;
+}
+@keyframes skillNodePulseCursed{
+  0%,100%{ box-shadow:0 0 16px rgba(255,77,77,.5); }
+  50%{ box-shadow:0 0 26px rgba(255,77,77,.85); }
+}
+.skilltree-node.cursed .skilltree-node-label{ color:#ff8a8a; }
+
+/* Per-node cost badge — small pill pinned to the top-right of the circle so
+   the point cost is legible without hovering for the title tooltip (matters
+   more now that costs range 1-3+ across the megaupdate content). */
+.skilltree-node-cost{
+  position:absolute; top:-6px; right:-6px; min-width:18px; height:18px;
+  padding:0 4px; border-radius:9px; background:var(--gold); color:#1a1408;
+  font-size:10px; font-weight:800; line-height:18px; text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.4); pointer-events:none;
+}
+/* Ascension's cost badge (always "5") gets the same cyan tint as its ring,
+   so the badge alone reads as "this is the expensive endgame kind" even at
+   a glance where the ring itself might be partly occluded by a sibling
+   node. Capstone keeps the default gold badge — it already matches gold.
+   :not(.unaffordable) so the red "can't afford it" signal above always
+   wins regardless of stylesheet order — losing that signal to a color
+   swap would be a real regression, not just a missed cosmetic touch. */
+.skilltree-node.ascension:not(.unaffordable) .skilltree-node-cost{ background:#4fd8ff; color:#052430; }
+
+/* Mirrors .skilltree-node-cost on the opposite corner — flags a node whose
+   effect is a uniqueField/uniqueFlag (a real mechanic change, e.g. a new
+   ability or a tuned-up class-specific system) rather than a plain stat
+   bump, so it's visible at a glance across a huge tree without hovering
+   every node for its tooltip. */
+.skilltree-node-unique{
+  position:absolute; top:-6px; left:-6px; width:18px; height:18px;
+  border-radius:50%; background:#4fd8ff; color:#052430;
+  font-size:11px; font-weight:800; line-height:18px; text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.4); pointer-events:none;
+}
+
+/* Sell-back — an owned FRONTIER leaf (no owned children, no unlock effect;
+   see canSellSkillNode in skilltree.js) gets a small ↩ badge in the one
+   remaining free corner (bottom-right) and a pointer cursor; clicking it
+   opens a native confirm() before refunding. Deliberately understated (dim
+   until hovered) so it never reads as "something is wrong with this node"
+   at a glance — it's an option, not a warning. */
+.skilltree-node.sellable{ cursor:pointer; }
+.skilltree-node-refund{
+  position:absolute; bottom:-6px; right:-6px; width:16px; height:16px;
+  border-radius:50%; background:var(--panel-hi); color:var(--muted);
+  border:1px solid var(--border-soft);
+  font-size:10px; font-weight:800; line-height:15px; text-align:center;
+  pointer-events:none; opacity:.6; transition:opacity var(--transition-fast);
+}
+.skilltree-node.sellable:hover .skilltree-node-refund{ opacity:1; color:#ff8a8a; border-color:#ff8a8a; }
+
+/* One-shot flash on the node that was just bought (see skillTreeLastBoughtId
+   in skilltree.js) — a quick bright ring-burst so the purchase reads as an
+   event, not just a silent class swap from buyable to owned. */
+.skilltree-node.just-bought{ animation:skillNodeJustBought .6s ease-out; }
+@keyframes skillNodeJustBought{
+  0%{ box-shadow:0 0 0 0 rgba(227,193,93,.9); transform:scale(1.25); }
+  100%{ box-shadow:0 0 16px rgba(227,193,93,.25); transform:scale(1); }
+}
+
+/* Search highlight — a bright pulsing outline ring so a search match stands
+   out from every other visible node at a glance, independent of its
+   owned/buyable/cursed state. */
+.skilltree-node.search-match{
+  outline:3px solid #4fd8ff; outline-offset:3px;
+  animation:skillNodeSearchPulse 1s ease-in-out infinite;
+}
+@keyframes skillNodeSearchPulse{
+  0%,100%{ outline-color:#4fd8ff; }
+  50%{ outline-color:#bff3ff; }
+}
+
+/* ---------- Skill Tree panel — toolbar (jump-to-character, search, recenter) */
+.skilltree-toolbar{
+  display:flex; align-items:center; justify-content:center; gap:8px; flex:0 0 auto;
+  flex-wrap:wrap; margin:2px 0 8px; width:100%;
+}
+.skilltree-toolbar select, .skilltree-toolbar input[type="text"]{
+  background:var(--panel); color:var(--ink); border:1px solid var(--border-soft);
+  border-radius:8px; padding:6px 10px; font-size:13px; font-family:inherit;
+}
+.skilltree-toolbar input[type="text"]{ width:160px; }
+.skilltree-toolbar button{
+  background:var(--panel); color:var(--ink); border:1px solid var(--border-soft);
+  border-radius:8px; padding:6px 10px; font-size:13px; cursor:pointer;
+  font-family:inherit;
+}
+.skilltree-toolbar button:hover{ filter:brightness(1.15); }
+#skillTreeSearchCount{ font-size:12px; opacity:.7; min-width:44px; text-align:center; }
+
+/* ---------- Skill Tree panel — filter bar (dim non-matching nodes) ---------- */
+.skilltree-filter-bar{
+  display:flex; align-items:center; justify-content:center; gap:6px; flex:0 0 auto;
+  flex-wrap:wrap; margin:0 0 6px; width:100%;
+}
+.skilltree-filter-btn{
+  background:var(--panel); color:var(--muted); border:1px solid var(--border-soft);
+  border-radius:999px; padding:4px 12px; font-size:11.5px; font-weight:600; cursor:pointer;
+  font-family:inherit; transition:filter var(--transition-fast), transform var(--transition-fast);
+}
+.skilltree-filter-btn:hover{ filter:brightness(1.15); }
+.skilltree-filter-btn.active{
+  background:linear-gradient(160deg, var(--accent), #6d3fc9); color:#fff; border-color:transparent;
+  box-shadow:0 0 10px rgba(139,92,246,.4);
+}
+
+/* ---------- Skill Tree panel — hover/click detail panel ---------- */
+/* Pinned bottom-left of the overlay (mirrors #skillTreeMinimap's bottom-
+   right placement); populated by showSkillNodeDetail() in skilltree.js.
+   Border color reflects the hovered node's state via .detail-owned/
+   .detail-cursed modifier classes, same palette as the node itself. */
+#skillTreeDetailPanel{
+  position:absolute; left:18px; bottom:56px; width:240px; max-height:220px;
+  background:rgba(10,9,16,.92); border:1px solid var(--border-soft);
+  border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.4);
+  padding:10px 12px; pointer-events:none; overflow-y:auto;
+  transition:opacity var(--transition-fast), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+#skillTreeDetailPanel.hidden{ display:none; }
+#skillTreeDetailPanel.detail-owned{ border-color:rgba(227,193,93,.55); box-shadow:0 4px 16px rgba(0,0,0,.4), 0 0 14px rgba(227,193,93,.12); }
+#skillTreeDetailPanel.detail-cursed{ border-color:rgba(255,77,77,.55); box-shadow:0 4px 16px rgba(0,0,0,.4), 0 0 14px rgba(255,77,77,.16); }
+.skilltree-detail-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.skilltree-detail-name{ font-size:13.5px; font-weight:800; color:var(--ink); }
+.skilltree-detail-cost{
+  font-size:11px; font-weight:700; color:#1a1408; background:var(--gold);
+  border-radius:8px; padding:1px 7px; flex:0 0 auto;
+}
+.skilltree-detail-desc{ font-size:12px; line-height:1.4; color:var(--muted); margin-bottom:6px; }
+.skilltree-detail-effects{ display:flex; flex-direction:column; gap:3px; }
+.skilltree-detail-effect-row{
+  font-size:11.5px; color:#bff3ff; background:rgba(79,216,255,.08);
+  border-radius:6px; padding:2px 7px;
+}
+.skilltree-detail-effect-total{
+  display:block; font-size:10px; color:var(--muted); margin-top:1px;
+}
+
+/* ---------- Skill Tree panel — build overview (per-character totals) ---------- */
+/* Top-right, opposite the minimap (bottom-right) and detail panel
+   (bottom-left) — the header/toolbar rows above sit in normal flex flow at
+   the very top of the overlay and are centered, so this corner stays clear
+   at any panel width worth supporting. */
+#skillTreeOverviewPanel{
+  position:absolute; right:18px; top:118px; width:230px; max-height:280px;
+  background:rgba(10,9,16,.92); border:1px solid var(--border-soft);
+  border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,.4);
+  padding:8px 10px; overflow-y:auto; z-index:5;
+}
+#skillTreeOverviewPanel.hidden{ display:none; }
+.skilltree-overview-head{
+  display:flex; align-items:center; justify-content:space-between;
+  font-size:12.5px; font-weight:800; color:var(--ink); margin-bottom:6px;
+}
+#skillTreeOverviewCloseBtn{
+  background:none; border:none; color:var(--muted); font-size:16px; line-height:1;
+  cursor:pointer; padding:0 2px;
+}
+#skillTreeOverviewCloseBtn:hover{ color:var(--ink); }
+.skilltree-overview-empty{ font-size:11.5px; color:var(--muted); font-style:italic; }
+.skilltree-overview-list{ display:flex; flex-direction:column; gap:3px; }
+.skilltree-overview-row{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; background:var(--panel); border:1px solid var(--border-soft);
+  border-radius:7px; padding:4px 8px; cursor:pointer; font-family:inherit;
+  color:var(--ink); transition:filter var(--transition-fast);
+}
+.skilltree-overview-row:hover{ filter:brightness(1.2); }
+.skilltree-overview-name{ font-size:11.5px; font-weight:700; text-align:left; }
+.skilltree-overview-stats{ font-size:10.5px; color:var(--muted); flex:0 0 auto; }
+
+/* ---------- Skill Tree panel — legend, pinned under the canvas */
+/* ---------- Skill Tree panel — minimap. Fixed in the bottom-right corner of
+   the overlay (which is itself position:absolute — see .overlay — so this
+   positions correctly without needing its own containing-block wrapper).
+   Drawn/updated entirely from JS (skilltree.js's drawMinimap) on every
+   panel (re)build and on every pan/zoom/drag tick; the element itself is
+   just an empty canvas plus this static chrome. */
+#skillTreeMinimap{
+  position:absolute; right:18px; bottom:56px; width:170px; height:130px;
+  background:rgba(10,9,16,.78); border:1px solid var(--border-soft);
+  border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.4);
+  cursor:pointer;
+}
+/* Small zoom-percent pill pinned directly above the minimap. */
+.skilltree-zoom-readout{
+  position:absolute; right:18px; bottom:190px; min-width:170px;
+  text-align:center; font-size:11px; font-weight:700; color:var(--muted);
+  background:rgba(10,9,16,.78); border:1px solid var(--border-soft);
+  border-radius:8px; padding:2px 0; pointer-events:none;
+}
+.skilltree-legend{
+  display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;
+  flex:0 0 auto; padding:8px 2px 0; font-size:12px; opacity:.85; width:100%;
+}
+.skilltree-legend span{ display:inline-flex; align-items:center; gap:6px; }
+.skilltree-legend .sk-swatch{
+  display:inline-block; width:12px; height:12px; border-radius:50%;
+  border:2px solid var(--border-soft); background:linear-gradient(160deg, var(--panel-hi), var(--panel));
+}
+.skilltree-legend .sk-swatch.owned{ border-color:rgba(227,193,93,.65); background:linear-gradient(160deg,#4a3f1c,#241d0c); }
+.skilltree-legend .sk-swatch.buyable{ border-color:var(--accent); background:linear-gradient(160deg,#3a2c5c,#221942); }
+.skilltree-legend .sk-swatch.unaffordable{ opacity:.55; filter:grayscale(.35); }
+.skilltree-legend .sk-swatch.cursed{
+  border-radius:2px; transform:rotate(45deg); border-color:#ff4d4d;
+  background:linear-gradient(160deg,#6e1c1c,#2a0808);
+}
+.skilltree-legend .sk-swatch.unique{
+  background:#4fd8ff; border-color:#4fd8ff; color:#052430;
+  font-size:9px; line-height:12px; text-align:center;
+}
+.skilltree-legend .sk-swatch.capstone{
+  border-width:3px; border-color:#e3c15d; background:linear-gradient(160deg,#4a3f1c,#241d0c);
+  color:#e3c15d; font-size:9px; line-height:11px; text-align:center;
+}
+.skilltree-legend .sk-swatch.ascension{
+  border-width:3px; border-color:#4fd8ff; background:linear-gradient(160deg,#241c3a,#0e0a1c);
+  color:#4fd8ff; font-size:9px; line-height:11px; text-align:center;
+}
+.skilltree-legend-note{ opacity:.65; font-style:italic; }
+
+/* ---------- Skill Tree panel — full-screen overlay. Distinct from the
+   Achievements/Bestiary panels, which keep the shared centered/padded
+   .achv-overlay sizing untouched. #skillTreeScreen carries BOTH classes;
+   these rules override just the sizing so the tree gets the whole
+   viewport. Header (h2 + summary) and the Close button stay in normal
+   flex flow at top/bottom (pinned); #skillTreeList — the pan/zoom canvas
+   area — is given all remaining vertical space. */
+.skilltree-overlay{ padding:14px 16px 12px; overflow:hidden; }
+.skilltree-overlay h2{ flex:0 0 auto; margin:0; }
+.skilltree-overlay #skillTreeSummary{ flex:0 0 auto; }
+.skilltree-overlay #skillTreeCloseBtn{ flex:0 0 auto; }
+.skilltree-overlay #skillTreeList{
+  flex:1 1 auto; width:100%; max-width:none; min-height:0;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.skilltree-overlay #skillTreeList .skilltree-scroll{
+  flex:1 1 auto; min-height:0; width:100%; max-width:100%;
+  overflow:hidden; cursor:grab;
+}
+/* Toggled by buildSkillTreePanel's mousedown/mousemove/mouseup(-leave)
+   drag-to-pan handlers on .skilltree-scroll itself — see skilltree.js. */
+.skilltree-overlay #skillTreeList .skilltree-scroll.skilltree-dragging{ cursor:grabbing; }
+
+/* ---------- Touch controls (Phase 12 mobile pass) ----------------------
+   `.touch-only` is the single visibility gate for every element below:
+   shown ONLY on a device with no real hover and a coarse (finger, not
+   mouse/trackpad) primary pointer — i.e. an actual touchscreen, not just a
+   narrow desktop browser window. A precise phone/tablet with a stylus or a
+   desktop resized small never sees these; a real touch device always does,
+   at any screen size. `touch-action:none` on the interactive pieces stops
+   the browser's own scroll/pinch-zoom/double-tap-zoom gestures from ever
+   competing with a drag on the joystick or a tap on a button — combined
+   with the page-level `user-scalable=no` in index.html's viewport meta,
+   this is what keeps a frantic combat tap from ever accidentally panning or
+   zooming the page out from under the player. `env(safe-area-inset-*)` on
+   top of a fixed base offset in the calc() below keeps every control clear
+   of a notch/home-indicator/rounded-corner cutout on the devices that have
+   one, and is simply 0 (so a no-op) on every device that doesn't. */
+/* !important on both sides of this gate — several of the elements it
+   applies to (.touch-action-btn/.touch-util-btn below) also declare their
+   OWN unconditional `display:flex` just to center their emoji glyph, which
+   would otherwise win the cascade by source order on a non-touch device and
+   silently defeat the hide. */
+@media not all and (hover:hover) and (pointer:fine){
+  .touch-only{ display:flex !important; }
+  /* #rightPanel's narrow-screen fallback (.hud-panel-fallback, see game.js's
+     _positionHudPanels) turns it into a full-width strip pinned to the very
+     bottom of #canvasWrap — exactly where the joystick/action-bar below now
+     also live. It's a read-only synergy/item/familiar display
+     (pointer-events:none already), not a control, so on an actual touch
+     device it's the one thing safe to drop entirely to keep the bottom of
+     the screen clear for the controls that matter there. */
+  #rightPanel{ display:none; }
+}
+.touch-only{ display:none !important; }
+
+.touch-joystick{
+  position:absolute; z-index:6; touch-action:none;
+  left:calc(14px + env(safe-area-inset-left, 0px));
+  bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+  width:92px; height:92px;
+  align-items:center; justify-content:center;
+}
+.touch-joystick-ring{
+  position:absolute; inset:0; border-radius:50%;
+  background:var(--panel-glass); border:2px solid var(--border-soft);
+  box-shadow:var(--shadow-soft);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  /* a slow idle breathing pulse — a static ring easily reads as "just
+     decoration" the first time a touch player sees it; a little life makes
+     it read as "this is a movable control" before they even touch it */
+  animation:touchJoystickBreathe 3.2s ease-in-out infinite;
+}
+@keyframes touchJoystickBreathe{
+  0%,100%{ border-color:var(--border-soft); }
+  50%{ border-color:rgba(139,92,246,.4); }
+}
+@media (prefers-reduced-motion:reduce){ .touch-joystick-ring{ animation:none; } }
+.touch-joystick-knob{
+  position:absolute; top:50%; left:50%; width:42px; height:42px; border-radius:50%;
+  transform:translate(-50%,-50%);
+  background:linear-gradient(160deg, var(--accent), var(--accent-dim));
+  border:2px solid rgba(255,255,255,.25); box-shadow:var(--glow-accent), var(--shadow-soft);
+  transition:box-shadow var(--transition-fast);
+  pointer-events:none; /* the ring div is the actual pointer target — see main.js's bindTouchControls */
+}
+
+.touch-action-bar{
+  position:absolute; z-index:6; touch-action:none;
+  right:calc(10px + env(safe-area-inset-right, 0px));
+  bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+  align-items:center; gap:8px;
+}
+/* Left side, not right — #minimapWrap floats top-right against #app itself
+   (a wider/differently-anchored box than #canvasWrap, which these controls
+   are positioned inside), so reasoning precisely about vertical clearance
+   between the two isn't reliable across every screen size. The left side
+   only ever has the small mute/fullscreen buttons up near the true page
+   top, well clear of anywhere inside #canvasWrap (which starts below the
+   whole #hud block), so anchoring here sidesteps the collision risk
+   entirely rather than trying to out-calculate it. */
+.touch-utility-bar{
+  position:absolute; z-index:6; touch-action:none;
+  left:calc(10px + env(safe-area-inset-left, 0px));
+  top:calc(10px + env(safe-area-inset-top, 0px));
+  flex-direction:column; align-items:center; gap:6px;
+}
+.touch-action-btn, .touch-util-btn{
+  border-radius:50%; background:var(--panel-glass); border:2px solid var(--border-soft);
+  color:var(--ink); font-size:20px; line-height:1; cursor:pointer; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-soft); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  transition:transform var(--transition-fast), border-color var(--transition-fast), filter var(--transition-fast);
+}
+.touch-action-btn{ width:52px; height:52px; }
+.touch-action-btn-lg{ width:62px; height:62px; font-size:24px; border-color:var(--accent); box-shadow:var(--glow-accent), var(--shadow-soft); }
+.touch-util-btn{ width:38px; height:38px; font-size:15px; }
+.touch-action-btn:active, .touch-util-btn:active{ transform:scale(.9); filter:brightness(1.2); box-shadow:inset 0 0 12px rgba(0,0,0,.35), var(--shadow-soft); }
+.touch-only-turret{ border-color:rgba(180,140,224,.5); }
+/* JS-driven per-class visibility (ui.js updateHUD, mirroring the desktop
+   #resTurrets chip) must win over the media-query show/hide gate above —
+   both this and .touch-only are !important, so the tie is broken by
+   specificity: two classes here outweighs .touch-only's one. */
+.touch-only-turret.hidden{ display:none !important; }
 
 /* ---------- responsive ---------- */
 /* Whether there's room for the side panels depends on the canvas's actual

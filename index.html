@@ -2,17 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0a13">
 <title>Nightfall Charge — A Bat Pony's Stand</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- Slow-drifting ambient motes behind the main menu — purely decorative,
+     additive to the static body::before/::after gradient+twinkle layers in
+     style.css (those never move; these do). Sized/rendered from
+     js/ui/menu-backdrop.js, driven by main.js's loop() only while `game` is
+     null (i.e. only while the main menu is the visible screen). Lives
+     outside #app so its fixed full-viewport sizing never has to fight
+     #app's own layout. -->
+<canvas id="menuBackdrop"></canvas>
 
 <div id="app">
 
   <button id="muteBtn" class="mute-btn" title="Mute (M)">🔊</button>
   <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" step="5" title="Volume">
   <button id="fullscreenBtn" class="mute-btn fullscreen-btn" title="Fullscreen" aria-pressed="false">⛶</button>
+  <!-- Phase 13 visual pass (batch 1) — screenshot button, only shown once a
+       run is in progress (js/main.js toggles the .hidden class the same way
+       updateHUD toggles every other in-run-only chip). Saves the current
+       canvas frame as a PNG via a throwaway <a download>. -->
+  <button id="screenshotBtn" class="mute-btn screenshot-btn hidden" title="Save screenshot">📷</button>
 
   <!-- ===================== MAIN MENU ===================== -->
   <div id="mainMenu" class="screen">
@@ -30,10 +48,12 @@
     </div>
     <p class="hint">Move: WASD / Arrows &nbsp;·&nbsp; Attack: Left Click or Space &nbsp;·&nbsp; Bomb: B &nbsp;·&nbsp; Build Turret (hold): V &nbsp;·&nbsp; Active Item: E &nbsp;·&nbsp; Pill: Q &nbsp;·&nbsp; Star: R &nbsp;·&nbsp; Donate: F &nbsp;·&nbsp; Reroll: G &nbsp;·&nbsp; Arcade: H &nbsp;·&nbsp; Bestiary: C &nbsp;·&nbsp; Achievements: T &nbsp;·&nbsp; Pause: Esc</p>
     <h2 class="trophyTitle">Superbosses</h2>
-    <div id="trophyRow" class="trophy-row"></div>
+    <div id="trophyRow" class="trophy-routes"></div>
     <div class="menu-btn-row">
       <button id="achievementsBtn" class="achv-open-btn">🏆 Achievements<span id="achievementsNewBadge" class="new-badge hidden">NEW</span></button>
       <button id="bestiaryBtn" class="achv-open-btn">📖 Bestiary<span id="bestiaryNewBadge" class="new-badge hidden">NEW</span></button>
+      <button id="skillTreeBtn" class="achv-open-btn">🌳 Skill Tree<span id="skillTreePointsBadge" class="new-badge hidden"></span></button>
+      <button id="musicTestBtn" class="achv-open-btn">🎵 Music Test</button>
     </div>
   </div>
 
@@ -57,6 +77,83 @@
     <div id="bestiaryTabs" class="achv-filter"></div>
     <div id="bestiaryList" class="achv-list"></div>
     <button id="bestiaryCloseBtn">Close</button>
+  </div>
+
+  <!-- ===================== SKILL TREE ===================== -->
+  <div id="skillTreeScreen" class="screen hidden overlay achv-overlay skilltree-overlay">
+    <h2>Skill Tree</h2>
+    <div id="skillTreeSummary" class="achv-summary"></div>
+    <div id="skillTreeToolbar" class="skilltree-toolbar">
+      <select id="skillTreeJumpSelect" title="Jump to a character's branch"></select>
+      <input id="skillTreeSearchInput" type="text" placeholder="Search nodes…" autocomplete="off" />
+      <button id="skillTreeSearchPrevBtn" type="button" title="Previous match">◀</button>
+      <span id="skillTreeSearchCount"></span>
+      <button id="skillTreeSearchNextBtn" type="button" title="Next match">▶</button>
+      <button id="skillTreeRecenterBtn" type="button" title="Recenter on start">⌂ Recenter</button>
+      <button id="skillTreeOverviewBtn" type="button" title="Per-character build overview">📋 Overview</button>
+      <button id="skillTreeUndoBtn" type="button" title="Refund your most recent purchase this session">↩ Undo Last</button>
+    </div>
+    <div id="skillTreeFilterBar" class="skilltree-filter-bar">
+      <button type="button" class="skilltree-filter-btn" data-filter="all">All</button>
+      <button type="button" class="skilltree-filter-btn" data-filter="buyable">Affordable</button>
+      <button type="button" class="skilltree-filter-btn" data-filter="owned">Owned</button>
+      <button type="button" class="skilltree-filter-btn" data-filter="cursed">Cursed</button>
+      <button type="button" class="skilltree-filter-btn" data-filter="unique">Unique</button>
+      <button type="button" class="skilltree-filter-btn" data-filter="capstone" title="Capstone (♛) and Ascension (⚡) nodes">Endgame</button>
+    </div>
+    <div id="skillTreeList" class="achv-list"></div>
+    <!-- NOT a child of #skillTreeList — buildSkillTreePanel() does
+         wrap.innerHTML='' on that element every rebuild, which would wipe
+         this canvas out from under itself. Positioned absolutely against
+         #skillTreeScreen (itself position:absolute via .overlay) instead. -->
+    <canvas id="skillTreeMinimap" width="170" height="130" title="Click to jump — dots show every node you can currently see"></canvas>
+    <span id="skillTreeZoomReadout" class="skilltree-zoom-readout" title="Current zoom — scroll wheel or +/- to change"></span>
+    <!-- Persistent hover/click detail panel — replaces relying solely on the
+         native `title` tooltip (slow to appear, truncates, no styling). Also
+         NOT a child of #skillTreeList for the same wipe-on-rebuild reason as
+         the minimap above. Starts empty/hidden; populated by
+         showSkillNodeDetail() in skilltree.js. -->
+    <div id="skillTreeDetailPanel" class="skilltree-detail hidden">
+      <div class="skilltree-detail-head">
+        <span id="skillTreeDetailName" class="skilltree-detail-name"></span>
+        <span id="skillTreeDetailCost" class="skilltree-detail-cost"></span>
+      </div>
+      <div id="skillTreeDetailDesc" class="skilltree-detail-desc"></div>
+      <div id="skillTreeDetailEffects" class="skilltree-detail-effects"></div>
+    </div>
+    <!-- Build overview — every character with at least one owned node,
+         sorted by points invested. Toggled by #skillTreeOverviewBtn; rows
+         are clickable jump-to-character shortcuts. Same "sibling, not
+         child, of #skillTreeList" reasoning as the minimap/detail panel. -->
+    <div id="skillTreeOverviewPanel" class="skilltree-overview hidden">
+      <div class="skilltree-overview-head">
+        <span>Build Overview</span>
+        <button id="skillTreeOverviewCloseBtn" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="skillTreeOverviewList" class="skilltree-overview-list"></div>
+    </div>
+    <div id="skillTreeLegend" class="skilltree-legend">
+      <span><i class="sk-swatch owned"></i>Owned</span>
+      <span><i class="sk-swatch buyable"></i>Affordable</span>
+      <span><i class="sk-swatch unaffordable"></i>Need more points</span>
+      <span><i class="sk-swatch cursed"></i>Cursed (drawback)</span>
+      <span><i class="sk-swatch unique">✦</i>Unique mechanic</span>
+      <span><i class="sk-swatch capstone">♛</i>Capstone</span>
+      <span><i class="sk-swatch ascension">⚡</i>Ascension</span>
+      <span class="skilltree-legend-note">Buy a node to reveal its children · click an owned frontier node (↩) to sell it back · arrow keys pan · +/- zoom</span>
+    </div>
+    <button id="skillTreeCloseBtn">Close</button>
+  </div>
+
+  <!-- ===================== MUSIC TEST ===================== -->
+  <!-- A preview panel for audio.js's background tracks — not tied to any
+       run, purely for auditioning a track (or checking what's landed)
+       without playing. See ui/music-test.js. -->
+  <div id="musicTestScreen" class="screen hidden overlay achv-overlay">
+    <h2>🎵 Music Test</h2>
+    <p class="achv-summary">Preview a background track without starting a run. Closing this stops playback and brings the menu ambience back.</p>
+    <div id="musicTestList" class="achv-list"></div>
+    <button id="musicTestCloseBtn">Close</button>
   </div>
 
   <!-- ===================== GAME SCREEN ===================== -->
@@ -96,6 +193,32 @@
 
     <div id="canvasWrap">
       <canvas id="game" width="320" height="320"></canvas>
+
+      <!-- Touch controls (Phase 12 mobile pass) — only shown on a coarse-
+           pointer/no-hover device via the .touch-only gate in style.css, so
+           a mouse+keyboard player never sees them. Movement joystick sits
+           bottom-left, action buttons bottom-right; aiming/attacking still
+           happens by touching/dragging anywhere else on the canvas itself
+           (main.js's existing pointerdown/pointermove handlers already
+           treat any pointer the same as a mouse, touch included). See
+           js/ui/touch-controls.js for the wiring. -->
+      <div id="touchJoystick" class="touch-only touch-joystick" aria-hidden="true">
+        <div class="touch-joystick-ring"></div>
+        <div id="touchJoystickKnob" class="touch-joystick-knob"></div>
+      </div>
+      <div id="touchActionBar" class="touch-only touch-action-bar">
+        <button type="button" id="touchBombBtn" class="touch-action-btn" title="Place Bomb (B)">💣</button>
+        <button type="button" id="touchActiveBtn" class="touch-action-btn touch-action-btn-lg" title="Use Active Item (E)">✨</button>
+        <button type="button" id="touchPillBtn" class="touch-action-btn" title="Take Pill (Q)">💊</button>
+        <button type="button" id="touchStarBtn" class="touch-action-btn" title="Use Star (R)">⭐</button>
+        <button type="button" id="touchTurretBtn" class="touch-action-btn touch-only-turret hidden" title="Hold to Build Turret (V)">🔧</button>
+      </div>
+      <div id="touchUtilityBar" class="touch-only touch-utility-bar">
+        <button type="button" id="touchDonateBtn" class="touch-util-btn" title="Donate (F)">💰</button>
+        <button type="button" id="touchRerollBtn" class="touch-util-btn" title="Reroll (G)">🎲</button>
+        <button type="button" id="touchArcadeBtn" class="touch-util-btn" title="Arcade Interact (H)">🕹️</button>
+        <button type="button" id="touchPauseBtn" class="touch-util-btn" title="Pause">⏸️</button>
+      </div>
 
       <!-- side info panels — absolutely positioned in the idle space either
            side of the 320px canvas; hidden on narrow viewports (style.css) -->
@@ -144,11 +267,24 @@
   <div id="pauseScreen" class="screen hidden overlay">
     <h2>Paused</h2>
     <p id="pauseStats"></p>
-    <p class="hint">Move: WASD / Arrows &nbsp;·&nbsp; Attack: Left Click or Space &nbsp;·&nbsp; Bomb: B &nbsp;·&nbsp; Build Turret (hold): V &nbsp;·&nbsp; Active Item: E &nbsp;·&nbsp; Pill: Q &nbsp;·&nbsp; Star: R &nbsp;·&nbsp; Donate: F &nbsp;·&nbsp; Reroll: G &nbsp;·&nbsp; Arcade: H &nbsp;·&nbsp; Mute: M</p>
+    <div class="pause-keybinds">
+      <span class="pause-keybind"><kbd>WASD</kbd> Move</span>
+      <span class="pause-keybind"><kbd>Click</kbd> Attack</span>
+      <span class="pause-keybind"><kbd>B</kbd> Bomb</span>
+      <span class="pause-keybind"><kbd>V</kbd> Build Turret (hold)</span>
+      <span class="pause-keybind"><kbd>E</kbd> Active Item</span>
+      <span class="pause-keybind"><kbd>Q</kbd> Pill</span>
+      <span class="pause-keybind"><kbd>R</kbd> Star</span>
+      <span class="pause-keybind"><kbd>F</kbd> Donate</span>
+      <span class="pause-keybind"><kbd>G</kbd> Reroll</span>
+      <span class="pause-keybind"><kbd>H</kbd> Arcade</span>
+      <span class="pause-keybind"><kbd>M</kbd> Mute</span>
+    </div>
     <p id="pauseEquipped" class="pause-equipped"></p>
     <button id="resumeBtn">Resume</button>
     <button id="pauseAchievementsBtn">🏆 Achievements</button>
     <button id="pauseBestiaryBtn">📖 Bestiary</button>
+    <button id="pauseSkillTreeBtn">🌳 Skill Tree</button>
     <button id="quitBtn">Quit to Menu</button>
   </div>
 
@@ -181,9 +317,12 @@
 <script src="js/data/items-3.js"></script>
 <script src="js/data/items-4.js"></script>
 <script src="js/data/items-5.js"></script>
+<script src="js/data/items-6.js"></script>
+<script src="js/data/items-7.js"></script>
 <script src="js/data/trinkets-1.js"></script>
 <script src="js/data/trinkets-2.js"></script>
 <script src="js/data/familiars-1.js"></script>
+<script src="js/data/familiars-3.js"></script>
 <script src="js/data/familiars-2.js"></script>
 <script src="js/data/lists.js"></script>
 <script src="js/data/pickups.js"></script>
@@ -195,9 +334,30 @@
 <script src="js/data/enemies/types-2.js"></script>
 <script src="js/data/enemies/types-3.js"></script>
 <script src="js/data/enemies/types-4.js"></script>
+<script src="js/data/enemies/legacy-extra.js"></script>
+<script src="js/data/enemies/flies.js"></script>
+<script src="js/data/enemies/crypt-extra.js"></script>
+<script src="js/data/enemies/crypt-extra2.js"></script>
+<!-- Phase 10 extended main route, stages 4-13. These MUST sit above lists.js:
+     it snapshots ENEMY_LIST = Object.values(ENEMY_TYPES) exactly once. -->
+<script src="js/data/enemies/stage4-6-enemies.js"></script>
+<script src="js/data/enemies/stage7-9-enemies.js"></script>
+<script src="js/data/enemies/stage10-13-enemies.js"></script>
 <script src="js/data/enemies/lists.js"></script>
+<script src="js/data/enemies/minibosses.js"></script>
 <script src="js/data/enemies/bosses.js"></script>
+<!-- ...and these MUST sit below bosses.js/superbosses.js, which declare the
+     BOSS_TYPES/SUPERBOSSES objects they merge into. Each pushes onto the
+     matching _LIST itself, since those are snapshotted the same way. -->
+<script src="js/data/enemies/legacy-extra-bosses.js"></script>
+<script src="js/data/enemies/stage4-6-bosses.js"></script>
+<script src="js/data/enemies/stage7-9-bosses.js"></script>
+<script src="js/data/enemies/stage10-13-bosses.js"></script>
 <script src="js/data/enemies/superbosses.js"></script>
+<script src="js/data/enemies/stage4-6-superbosses.js"></script>
+<script src="js/data/enemies/stage7-9-superbosses.js"></script>
+<script src="js/data/enemies/stage10-13-superbosses.js"></script>
+<script src="js/data/enemies/superboss-routes.js"></script>
 
 <script src="js/data/stages.js"></script>
 
@@ -213,7 +373,32 @@
 <script src="js/achievements/defs-9.js"></script>
 <script src="js/achievements/defs-10.js"></script>
 <script src="js/achievements/defs-11.js"></script>
+<script src="js/achievements/defs-12.js"></script>
+<script src="js/achievements/defs-mastery.js"></script>
+<script src="js/achievements/bestiary-tiers.js"></script>
 <script src="js/achievements/logic.js"></script>
+<script src="js/achievements/skilltree.js"></script>
+<script src="js/achievements/skilltree-characters.js"></script>
+<script src="js/achievements/skilltree-characters-2.js"></script>
+<script src="js/achievements/skilltree-characters-3.js"></script>
+<script src="js/achievements/skilltree-characters-4a.js"></script>
+<script src="js/achievements/skilltree-characters-4b.js"></script>
+<script src="js/achievements/skilltree-characters-4c.js"></script>
+<script src="js/achievements/skilltree-characters-4d.js"></script>
+<script src="js/achievements/skilltree-characters-4e.js"></script>
+<script src="js/achievements/skilltree-characters-5a.js"></script>
+<script src="js/achievements/skilltree-characters-5b.js"></script>
+<script src="js/achievements/skilltree-characters-5c.js"></script>
+<script src="js/achievements/skilltree-characters-5d.js"></script>
+<script src="js/achievements/skilltree-characters-5e.js"></script>
+<script src="js/achievements/skilltree-capstones.js"></script>
+<script src="js/achievements/skilltree-ascensions.js"></script>
+<script src="js/achievements/skilltree-general.js"></script>
+<script src="js/achievements/skilltree-unlocks-stars.js"></script>
+<script src="js/achievements/skilltree-unlocks-familiars.js"></script>
+<script src="js/achievements/skilltree-unlocks-items.js"></script>
+<script src="js/achievements/skilltree-unlocks-items-2.js"></script>
+<script src="js/achievements/skilltree-unlocks-trinkets.js"></script>
 
 <script src="js/ui/bestiary.js"></script>
 
@@ -222,6 +407,15 @@
 <script src="js/data/roomTemplates/normal-2.js"></script>
 <script src="js/data/roomTemplates/normal-3.js"></script>
 <script src="js/data/roomTemplates/normal-4.js"></script>
+<script src="js/data/roomTemplates/firecolors.js"></script>
+<script src="js/data/roomTemplates/dnbfly-rooms.js"></script>
+<script src="js/data/roomTemplates/floorfeature.js"></script>
+<script src="js/data/roomTemplates/miniboss.js"></script>
+<!-- Phase 10 extended main route — these push onto the array floorfeature.js
+     assigns, so they must load after it. -->
+<script src="js/data/roomTemplates/stage4-6-floorfeature.js"></script>
+<script src="js/data/roomTemplates/stage7-9-floorfeature.js"></script>
+<script src="js/data/roomTemplates/stage10-13-floorfeature.js"></script>
 
 <script src="js/systems/dungeon.js"></script>
 <script src="js/systems/room.js"></script>
@@ -231,20 +425,44 @@
 <script src="js/systems/combat-2.js"></script>
 <script src="js/systems/combat-3.js"></script>
 <script src="js/systems/combat-4.js"></script>
+<script src="js/systems/ai-minibosses.js"></script>
+<script src="js/systems/ai-newshared.js"></script>
+<script src="js/systems/ai-legacy-bosses.js"></script>
+<script src="js/systems/ai-flies.js"></script>
+<script src="js/systems/ai-crypt.js"></script>
+<script src="js/systems/ai-crypt2.js"></script>
 <script src="js/systems/ai-1.js"></script>
 <script src="js/systems/ai-2.js"></script>
 <script src="js/systems/ai-3.js"></script>
 <script src="js/systems/ai-4.js"></script>
+<!-- Phase 10 content group 1 (stages 4-6). Populates ENEMY_BEHAVIOR_HANDLERS,
+     so it must load after combat-3.js (which declares that const) and after
+     ai-1..4.js, whose helpers its functions call. -->
+<script src="js/systems/ai-stage4-6.js"></script>
+<!-- Phase 10 content group 2 (stages 7-9). Same constraint as group 1's file
+     above: populates ENEMY_BEHAVIOR_HANDLERS, so it must load after
+     combat-3.js (which declares that const) and after ai-1..4.js, whose
+     helpers its function bodies call at runtime. -->
+<script src="js/systems/ai-stage7-9.js"></script>
+<!-- Phase 10 content group 3 (stages 10-13, floorNum 27-34, including the
+     main route's new final floor). Same constraint as groups 1 and 2 above:
+     populates ENEMY_BEHAVIOR_HANDLERS, so it must load after combat-3.js
+     (which declares that const) and after ai-1..4.js, whose helpers —
+     chaseSeek/seekVector/fireProjectileAngle/dnbRing — its bodies call. -->
+<script src="js/systems/ai-stage10-13.js"></script>
 <script src="js/systems/familiars.js"></script>
 <script src="js/systems/pills.js"></script>
 <script src="js/systems/stars.js"></script>
 <script src="js/systems/items-1.js"></script>
+<script src="js/systems/items-synergy.js"></script>
 <script src="js/systems/items-2.js"></script>
 <script src="js/systems/shop.js"></script>
 
 <script src="js/ui/ui.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui/render.js"></script>
+<script src="js/ui/menu-backdrop.js"></script>
+<script src="js/ui/music-test.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
